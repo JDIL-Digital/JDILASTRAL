@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   Theme tokens — RGB triplets so Tailwind <alpha-value> works.
+   Dark mode: charcoal #1A1A2E base, navy surface #16213E, deepest navy
+   sidebar #0D1B2A. Light mode: warm white #FAFAFA base, white surface.
+   =========================================================================== */
+:root,
+html.dark {
+  color-scheme: dark;
+  --brand-bg: 26 26 46;             /* #1A1A2E */
+  --brand-surface: 22 33 62;        /* #16213E */
+  --brand-surface-elevated: 30 41 70;
+  --brand-border: 42 63 82;         /* #2A3F52 */
+  --brand-text: 245 245 245;        /* #F5F5F5 */
+  --brand-muted: 138 155 176;       /* #8A9BB0 */
+  --sidebar-bg: 13 27 42;           /* #0D1B2A deepest navy */
+  --sidebar-text: 245 245 245;
+  --topbar-bg: 22 33 62;
+  --rig-panel-bg: 13 27 42;         /* #0D1B2A */
+  --rig-panel-alpha: 0.78;
+  --rig-overlay-end: 0 0 0;         /* black gradient end */
+  --rig-overlay-end-alpha: 0.85;
+  --rig-text: 245 245 245;
+  --glass-bg: 22 33 62;
+  --glass-alpha: 0.78;
+  --scrollbar-track: 26 26 46;
+  --scrollbar-thumb: 42 63 82;
+  --scrollbar-thumb-hover: 58 83 106;
+}
+
+html.light {
+  color-scheme: light;
+  --brand-bg: 250 250 250;          /* #FAFAFA */
+  --brand-surface: 255 255 255;     /* #FFFFFF */
+  --brand-surface-elevated: 248 250 252;
+  --brand-border: 226 232 240;      /* #E2E8F0 */
+  --brand-text: 13 27 42;           /* #0D1B2A */
+  --brand-muted: 100 116 139;
+  --sidebar-bg: 255 255 255;
+  --sidebar-text: 13 27 42;
+  --topbar-bg: 255 255 255;
+  --rig-panel-bg: 255 255 255;
+  --rig-panel-alpha: 0.88;
+  --rig-overlay-end: 255 255 255;
+  --rig-overlay-end-alpha: 0.15;
+  --rig-text: 13 27 42;
+  --glass-bg: 255 255 255;
+  --glass-alpha: 0.82;
+  --scrollbar-track: 250 250 250;
+  --scrollbar-thumb: 203 213 225;
+  --scrollbar-thumb-hover: 148 163 184;
+  --calendar-icon-invert: 0.15;
+}
+
+/* ===========================================================================
+   Base
+   =========================================================================== */
+html,
+body {
+  background-color: rgb(var(--brand-bg));
+  color: rgb(var(--brand-text));
+  min-height: 100%;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+body {
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+* {
+  border-color: rgb(var(--brand-border));
+}
+
+::selection {
+  background: rgba(26, 122, 60, 0.35);
+  color: rgb(var(--brand-text));
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgb(var(--scrollbar-track)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--scrollbar-thumb)); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--scrollbar-thumb-hover)); }
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(var(--calendar-icon-invert, 0.8));
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+/* ===========================================================================
+   Reusable component utilities
+   =========================================================================== */
+.surface-glass {
+  background-color: rgb(var(--glass-bg) / var(--glass-alpha));
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.rig-photo-overlay {
+  background: linear-gradient(
+    to top,
+    rgb(var(--rig-overlay-end) / var(--rig-overlay-end-alpha)) 0%,
+    rgb(var(--rig-overlay-end) / calc(var(--rig-overlay-end-alpha) * 0.45)) 45%,
+    transparent 80%
+  );
+}
+
+.rig-panel {
+  background-color: rgb(var(--rig-panel-bg) / var(--rig-panel-alpha));
+  color: rgb(var(--rig-text));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(26, 122, 60, 0.32);
+}
+
+.sidebar-shell {
+  background-color: rgb(var(--sidebar-bg));
+  color: rgb(var(--sidebar-text));
+}
+
+.topbar-shell {
+  background-color: rgb(var(--topbar-bg) / 0.92);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+html.light .topbar-shell {
+  box-shadow: 0 1px 0 rgb(var(--brand-border) / 1), 0 1px 12px -8px rgb(0 0 0 / 0.18);
+  border-bottom-color: transparent;
+}
+
+/* Typography helpers */
+.text-label {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  color: rgb(var(--brand-muted));
+}
+.text-kpi {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Sign In shimmer */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 75%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  transition: left 0.7s ease;
+}
+.btn-shine:hover::after {
+  left: 150%;
+}
+
+/* Green gradient text — for "JSIL·ASTRAL" hero wordmark */
+.text-brand-gradient {
+  background: linear-gradient(135deg, #1A7A3C 0%, #22C55E 50%, #1A7A3C 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-size: 200% 200%;
+  animation: gradient-shift 6s ease-in-out infinite;
+}
+
+/* ===========================================================================
+   Keyframes
+   =========================================================================== */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Slow drifting blobs for hero / login backgrounds */
+@keyframes blob-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(40px, -30px) scale(1.08); }
+  66%      { transform: translate(-30px, 40px) scale(0.94); }
+}
+@keyframes blob-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-50px, 30px) scale(1.12); }
+}
+@keyframes blob-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(30px, -40px) scale(1.06); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 122, 60, 0.4); }
+  50%      { box-shadow: 0 0 0 6px rgba(26, 122, 60, 0); }
+}
+
+/* Stagger helpers — n × 80ms */
+.delay-step-0 { animation-delay: 0ms;  }
+.delay-step-1 { animation-delay: 80ms; }
+.delay-step-2 { animation-delay: 160ms;}
+.delay-step-3 { animation-delay: 240ms;}
+.delay-step-4 { animation-delay: 320ms;}
+.delay-step-5 { animation-delay: 400ms;}
+.delay-step-6 { animation-delay: 480ms;}
+.delay-step-7 { animation-delay: 560ms;}
+
+.animate-fade-in       { animation: fade-in 0.35s ease-out both; }
+.animate-fade-in-up    { animation: fade-in-up 0.45s ease-out both; }
+.animate-slide-in-right{ animation: slide-in-right 0.25s ease-out both; }
+.animate-blob-a        { animation: blob-drift-a 22s ease-in-out infinite; }
+.animate-blob-b        { animation: blob-drift-b 28s ease-in-out infinite; }
+.animate-blob-c        { animation: blob-drift-c 30s ease-in-out infinite; }
+.animate-pulse-dot     { animation: pulse-glow 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

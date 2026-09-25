@@ -1,0 +1,17 @@
+run = "npm run start"
+entrypoint = "src/app/page.tsx"
+
+[nix]
+channel = "stable-23_11"
+
+[deployment]
+run = ["sh", "-c", "npm run build && npm run start"]
+deploymentTarget = "cloudrun"
+
+[env]
+NEXT_TELEMETRY_DISABLED = "1"
+NODE_ENV = "production"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
