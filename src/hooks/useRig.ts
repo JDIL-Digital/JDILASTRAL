@@ -1,55 +1,79 @@
 "use client";
 
-import { useMemo } from "react";
-import { RIGS, type RigName } from "@/lib/constants";
-import { slugify } from "@/lib/utils";
-import type { Rig } from "@/types";
+import { useCallback, useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { DbRig } from "@/types/database";
+
+interface UseRigResult {
+  rig: DbRig | null;
+  projectsCount: number;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+}
 
 /**
- * Synchronous, network-free seed data — keeps the fleet dashboard rendering
- * in < 100 ms on first paint. When the rigs table is provisioned in Supabase,
- * swap this for a SWR/React-Query hook that hydrates from `seedRig()` and
- * revalidates in the background.
+ * Fetches a single rig by id OR by url-safe slug/name match — the
+ * dashboard uses slugified names in URLs, so we fall back to a
+ * case-insensitive name lookup when the parameter isn't a uuid.
  */
-function seedRig(name: RigName, index: number): Rig {
-  const budget = 60_000_000 + index * 7_500_000;
-  const spent = budget * (0.32 + (index % 5) * 0.07);
-  const committed = budget * (0.18 - (index % 3) * 0.03);
-  return {
-    id: slugify(name),
-    name,
-    type: "Jackup",
-    location: ["Mumbai High", "Krishna-Godavari", "Cauvery Basin", "Cambay Basin"][index % 4],
-    operator: "ONGC",
-    status: index === 4 ? "maintenance" : index === 5 ? "transit" : "operational",
-    daily_rate_usd: 85_000 + index * 2500,
-    contract_start: "2025-01-01",
-    contract_end: "2028-12-31",
-    total_budget_usd: budget,
-    spent_usd: Math.round(spent),
-    committed_usd: Math.round(committed),
-    utilization_pct: 78 + (index % 5) * 4,
-    created_at: "2025-01-01T00:00:00Z",
-    updated_at: "2025-01-01T00:00:00Z",
-  };
-}
+export function useRig(rigIdOrSlug: string): UseRigResult {
+  const [rig, setRig] = useState<DbRig | null>(null);
+  const [projectsCount, setProjectsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-const SEEDED_RIGS: Rig[] = RIGS.map((n, i) => seedRig(n, i));
+  const fetchRig = useCallback(async () => {
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      setError("Supabase not configured");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          rigIdOrSlug,
+        );
+      let query = client.from("rigs").select("*").limit(1);
 
-export function useRigs() {
-  // Memoize the array reference so consumers' useMemo/useEffect deps stay stable.
-  const rigs = useMemo(() => SEEDED_RIGS, []);
-  return { rigs, loading: false, error: null as string | null };
-}
+      if (isUuid) {
+        query = query.eq("id", rigIdOrSlug);
+      } else {
+        // Rig names in URLs are slug form ("jindal-star"); DB stores
+        // display form ("Jindal Star"). Match case-insensitively.
+        const searchName = rigIdOrSlug.replace(/-/g, " ");
+        query = query.ilike("name", searchName);
+      }
 
-export function useRig(rigIdOrSlug: string) {
-  const { rigs, loading, error } = useRigs();
-  const rig = useMemo(
-    () =>
-      rigs.find((r) => r.id === rigIdOrSlug) ??
-      rigs.find((r) => slugify(r.name) === rigIdOrSlug) ??
-      null,
-    [rigs, rigIdOrSlug],
-  );
-  return { rig, loading, error };
+      const { data, error: err } = await query;
+      if (err) throw err;
+      const rows = (data ?? []) as unknown as DbRig[];
+      const found = rows[0] ?? null;
+      setRig(found);
+
+      if (found) {
+        const { count, error: countErr } = await client
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("rig_id", found.id);
+        if (countErr) throw countErr;
+        setProjectsCount(count ?? 0);
+      } else {
+        setProjectsCount(0);
+      }
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load rig");
+    } finally {
+      setLoading(false);
+    }
+  }, [rigIdOrSlug]);
+
+  useEffect(() => {
+    void fetchRig();
+  }, [fetchRig]);
+
+  return { rig, projectsCount, loading, error, refresh: fetchRig };
 }

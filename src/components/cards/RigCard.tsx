@@ -10,8 +10,15 @@ import { rigMetaFor } from "@/lib/rigMeta";
 import { BLUR_DATA_URL, type RigName } from "@/lib/constants";
 import type { Rig } from "@/types";
 
+/**
+ * The card accepts any rig-like row (Supabase's `rigs` table returns a
+ * plain `string` name, not the strict `RigName` union). We narrow to
+ * `RigName` only when looking up display metadata.
+ */
+type RigLike = Omit<Partial<Rig>, "name"> & { name: string };
+
 interface RigCardProps {
-  rig: Partial<Rig> & { name: string };
+  rig: RigLike;
   className?: string;
   /** Index drives the staggered fade-in delay on the fleet grid. */
   index?: number;

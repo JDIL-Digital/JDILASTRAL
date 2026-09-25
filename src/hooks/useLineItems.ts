@@ -1,65 +1,161 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { convert } from "@/lib/currency/exchangeRate";
-import type { Currency } from "@/lib/constants";
-import type { LineItem } from "@/types";
+import { useCallback, useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { registerRealtimeChannel } from "@/hooks/useRealtimeStatus";
+import type { Database, DbLineItem } from "@/types/database";
 
-const SEED_DESCRIPTIONS = [
-  { sku: "BHA-2451", desc: 'Drill Bit 12 1/4" PDC', category: "Drilling Tools", vendor: "Halliburton" },
-  { sku: "CSG-7-9TR", desc: 'Casing 9 5/8" L80', category: "Casing & Tubing", vendor: "Tenaris" },
-  { sku: "MUD-BARITE", desc: "Barite Weighting Agent", category: "Mud Chemicals", vendor: "M-I SWACO" },
-  { sku: "CEM-CL-G", desc: "Class G Oilwell Cement", category: "Cementing", vendor: "Schlumberger" },
-  { sku: "LWD-MWD-01", desc: "MWD/LWD Tool Rental — 30 days", category: "Logging", vendor: "Baker Hughes" },
-  { sku: "CHRT-WHD-5K", desc: "5K Wellhead Christmas Tree", category: "Wellhead", vendor: "Cameron" },
-  { sku: "MAR-SUPPLY", desc: "Marine Supply Vessel Charter", category: "Logistics", vendor: "GAC Group" },
-  { sku: "CAT-OFF-30", desc: "Offshore Catering — 30 PAX/day", category: "Catering", vendor: "Sodexo" },
-  { sku: "HSE-LIFE-50", desc: "Life Jackets (Pack of 50)", category: "HSE", vendor: "Survitec" },
-  { sku: "SPR-BOP-RM", desc: "BOP Ram Spares Kit", category: "BOP Spares", vendor: "NOV" },
-  { sku: "INSP-NDT-Q3", desc: "NDT Inspection Services — Q3", category: "Inspection", vendor: "Bureau Veritas" },
-  { sku: "FUEL-MDO-T", desc: "Marine Diesel Oil — per tonne", category: "Fuel", vendor: "Indian Oil" },
-];
+type LineItemInsert = Database["public"]["Tables"]["line_items"]["Insert"];
+type LineItemUpdate = Database["public"]["Tables"]["line_items"]["Update"];
 
-function seedLineItems(annexureId: string): LineItem[] {
-  return SEED_DESCRIPTIONS.map((s, i) => {
-    const currency: Currency = (["USD", "INR", "AED"] as const)[i % 3] as Currency;
-    const quantity = 1 + (i % 8);
-    const unit_price = (1500 + i * 425) * (currency === "INR" ? 80 : currency === "AED" ? 3.5 : 1);
-    const total_local = quantity * unit_price;
-    const total_usd = convert(total_local, currency, "USD");
-    const budgeted_usd = total_usd * (1 + (i % 5 === 0 ? -0.08 : 0.05));
-    return {
-      id: `${annexureId}-li-${i}`,
-      annexure_id: annexureId,
-      sku: s.sku,
-      description: s.desc,
-      category: s.category,
-      vendor: s.vendor,
-      uom: ["EA", "MT", "BBL", "DAY", "LOT"][i % 5],
-      quantity,
-      unit_price,
-      currency,
-      total_local,
-      total_usd: Math.round(total_usd),
-      budgeted_usd: Math.round(budgeted_usd),
-      status: (["planned", "requested", "ordered", "received", "invoiced", "paid"] as const)[i % 6],
-      po_id: null,
-      required_by: `2026-0${(i % 9) + 1}-15`,
-      notes: null,
-      created_at: "2025-01-01T00:00:00Z",
-      updated_at: "2025-01-01T00:00:00Z",
-    };
-  });
+interface UseLineItemsResult {
+  lineItems: DbLineItem[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  addLineItem: (item: Omit<LineItemInsert, "annexure_id">) => Promise<DbLineItem | null>;
+  updateLineItem: (id: string, patch: LineItemUpdate) => Promise<DbLineItem | null>;
+  deleteLineItem: (id: string) => Promise<boolean>;
 }
 
-export function useLineItems(annexureId: string) {
-  const initial = useMemo(() => seedLineItems(annexureId), [annexureId]);
-  const [items, setItems] = useState<LineItem[]>(initial);
+/**
+ * Live line-item feed for a single annexure.
+ *
+ * Includes CRUD helpers that write to Supabase and return the affected
+ * row so callers can drive toast notifications. All mutations trigger a
+ * realtime broadcast which refreshes this hook (and any other consumer)
+ * automatically.
+ */
+export function useLineItems(annexureId: string | null | undefined): UseLineItemsResult {
+  const [lineItems, setLineItems] = useState<DbLineItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Re-seed if annexureId changes mid-mount
-  if (items[0]?.annexure_id !== annexureId) {
-    setItems(initial);
-  }
+  const fetchLineItems = useCallback(async () => {
+    if (!annexureId) {
+      setLineItems([]);
+      setLoading(false);
+      return;
+    }
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      setError("Supabase not configured");
+      setLoading(false);
+      return;
+    }
+    try {
+      const { data, error: err } = await client
+        .from("line_items")
+        .select("*")
+        .eq("annexure_id", annexureId)
+        .order("sr_no", { ascending: true, nullsFirst: false });
+      if (err) throw err;
+      setLineItems(data ?? []);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load line items");
+    } finally {
+      setLoading(false);
+    }
+  }, [annexureId]);
 
-  return { items, loading: false, error: null as string | null, setItems };
+  useEffect(() => {
+    void fetchLineItems();
+  }, [fetchLineItems]);
+
+  // Realtime — subscribe only to changes for this annexure.
+  useEffect(() => {
+    if (!annexureId) return;
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+
+    const channel = client
+      .channel(`line-items-${annexureId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "line_items",
+          filter: `annexure_id=eq.${annexureId}`,
+        },
+        () => {
+          void fetchLineItems();
+        },
+      )
+      .subscribe();
+
+    const unregister = registerRealtimeChannel(`line-items:${annexureId}`);
+
+    return () => {
+      unregister();
+      void client.removeChannel(channel);
+    };
+  }, [annexureId, fetchLineItems]);
+
+  const addLineItem = useCallback<UseLineItemsResult["addLineItem"]>(
+    async (item) => {
+      if (!annexureId) return null;
+      const client = getSupabaseBrowserClient();
+      if (!client) return null;
+      const payload = { ...item, annexure_id: annexureId } as LineItemInsert;
+      const { data, error: err } = await (
+        client.from("line_items") as unknown as {
+          insert: (v: LineItemInsert) => {
+            select: () => { single: () => Promise<{ data: DbLineItem | null; error: unknown }> };
+          };
+        }
+      )
+        .insert(payload)
+        .select()
+        .single();
+      if (err) throw err;
+      return data;
+    },
+    [annexureId],
+  );
+
+  const updateLineItem = useCallback<UseLineItemsResult["updateLineItem"]>(
+    async (id, patch) => {
+      const client = getSupabaseBrowserClient();
+      if (!client) return null;
+      const { data, error: err } = await (
+        client.from("line_items") as unknown as {
+          update: (v: LineItemUpdate) => {
+            eq: (col: string, val: string) => {
+              select: () => { single: () => Promise<{ data: DbLineItem | null; error: unknown }> };
+            };
+          };
+        }
+      )
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
+      if (err) throw err;
+      return data;
+    },
+    [],
+  );
+
+  const deleteLineItem = useCallback<UseLineItemsResult["deleteLineItem"]>(
+    async (id) => {
+      const client = getSupabaseBrowserClient();
+      if (!client) return false;
+      const { error: err } = await client.from("line_items").delete().eq("id", id);
+      if (err) throw err;
+      return true;
+    },
+    [],
+  );
+
+  return {
+    lineItems,
+    loading,
+    error,
+    refresh: fetchLineItems,
+    addLineItem,
+    updateLineItem,
+    deleteLineItem,
+  };
 }

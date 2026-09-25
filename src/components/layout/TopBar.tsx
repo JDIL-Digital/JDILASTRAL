@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { useRealtimeStatus } from "@/hooks/useRealtimeStatus";
 import { ROLE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { breadcrumbsFromPath, type Crumb } from "@/lib/breadcrumbs";
@@ -30,6 +31,7 @@ export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
   const pathname = usePathname() ?? "/";
   const { user, signOut } = useAuth();
   const { theme, toggleTheme, mounted } = useTheme();
+  const { live } = useRealtimeStatus();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWrapperRef = useRef<HTMLDivElement>(null);
   const derived = useMemo(() => breadcrumbs ?? breadcrumbsFromPath(pathname), [breadcrumbs, pathname]);
@@ -124,6 +126,25 @@ export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
 
       {/* ---------- RIGHT — theme · bell · avatar ---------- */}
       <div className="flex flex-1 items-center justify-end gap-2">
+        {/* Live realtime indicator — green pulse when ≥ 1 channel is subscribed */}
+        <span
+          className={cn(
+            "hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider sm:inline-flex",
+            live
+              ? "border-brand-success/40 bg-brand-success/10 text-brand-success"
+              : "border-brand-border bg-brand-surface text-brand-muted",
+          )}
+          title={live ? "Realtime connection active" : "Realtime idle"}
+        >
+          <span
+            className={cn(
+              "inline-block h-1.5 w-1.5 rounded-full",
+              live ? "bg-brand-success animate-pulse-dot" : "bg-brand-muted",
+            )}
+          />
+          {live ? "Live" : "Idle"}
+        </span>
+
         {/* Search button visible on small screens (collapses center bar) */}
         <button
           type="button"

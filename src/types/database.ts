@@ -1,3 +1,12 @@
+/**
+ * Supabase database types — hand-authored to match
+ * supabase/migrations/001_initial_schema.sql exactly.
+ *
+ * Re-run `supabase gen types typescript --local` to auto-refresh from
+ * the live schema; the hand-written shape here is a safe fallback that
+ * matches the current migration 1:1.
+ */
+
 export type Json =
   | string
   | number
@@ -6,80 +15,57 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+export type RigStatus = "active" | "maintenance" | "standby";
+export type ProjectStatus = "active" | "completed" | "on-hold";
+export type LineItemCurrency = "USD" | "INR" | "AED";
+export type LineItemStatus = "pending" | "on-track" | "watch" | "overrun";
+export type POStatus = "draft" | "approved" | "issued" | "cancelled";
+export type ProfileRole = "engineer" | "manager" | "csuite";
+
 export interface Database {
   public: {
     Tables: {
-      users: {
-        Row: {
-          id: string;
-          email: string;
-          full_name: string;
-          role: "engineer" | "manager" | "csuite";
-          rig_access: string[] | null;
-          avatar_url: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          email: string;
-          full_name: string;
-          role?: "engineer" | "manager" | "csuite";
-          rig_access?: string[] | null;
-          avatar_url?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
-      };
       rigs: {
         Row: {
           id: string;
           name: string;
-          type: string;
-          location: string;
-          operator: string;
-          status: string;
-          daily_rate_usd: number;
-          contract_start: string;
-          contract_end: string;
-          total_budget_usd: number;
-          spent_usd: number;
-          committed_usd: number;
-          utilization_pct: number;
+          type: string | null;
+          status: RigStatus;
+          photo_url: string | null;
           created_at: string;
-          updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["rigs"]["Row"], "id" | "created_at" | "updated_at"> & {
+        Insert: {
           id?: string;
+          name: string;
+          type?: string | null;
+          status?: RigStatus;
+          photo_url?: string | null;
           created_at?: string;
-          updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["rigs"]["Insert"]>;
       };
       projects: {
         Row: {
           id: string;
-          rig_id: string;
+          rig_id: string | null;
           name: string;
-          client: string;
-          phase: string;
-          status: string;
-          start_date: string;
-          end_date: string;
-          budget_usd: number;
-          spent_usd: number;
-          committed_usd: number;
-          progress_pct: number;
-          manager_id: string;
+          description: string | null;
+          start_date: string | null;
+          end_date: string | null;
+          total_budget_usd: number;
+          status: ProjectStatus;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<
-          Database["public"]["Tables"]["projects"]["Row"],
-          "id" | "created_at" | "updated_at"
-        > & {
+        Insert: {
           id?: string;
+          rig_id?: string | null;
+          name: string;
+          description?: string | null;
+          start_date?: string | null;
+          end_date?: string | null;
+          total_budget_usd?: number;
+          status?: ProjectStatus;
           created_at?: string;
           updated_at?: string;
         };
@@ -88,55 +74,66 @@ export interface Database {
       annexures: {
         Row: {
           id: string;
-          project_id: string;
-          code: string;
+          project_id: string | null;
+          number: number;
           name: string;
-          description: string | null;
           budget_usd: number;
-          spent_usd: number;
-          committed_usd: number;
-          variance_pct: number;
-          owner_id: string | null;
           created_at: string;
-          updated_at: string;
         };
-        Insert: Omit<
-          Database["public"]["Tables"]["annexures"]["Row"],
-          "id" | "created_at" | "updated_at"
-        > & {
+        Insert: {
           id?: string;
+          project_id?: string | null;
+          number: number;
+          name: string;
+          budget_usd?: number;
           created_at?: string;
-          updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["annexures"]["Insert"]>;
       };
       line_items: {
         Row: {
           id: string;
-          annexure_id: string;
-          sku: string | null;
+          annexure_id: string | null;
+          sr_no: number | null;
+          material_code: string | null;
+          area: string | null;
           description: string;
-          category: string;
-          vendor: string | null;
-          uom: string;
-          quantity: number;
-          unit_price: number;
-          currency: string;
-          total_local: number;
-          total_usd: number;
-          budgeted_usd: number;
-          status: string;
-          po_id: string | null;
-          required_by: string | null;
-          notes: string | null;
+          work_by: string | null;
+          budget_usd: number;
+          actual_local_amount: number | null;
+          actual_local_currency: LineItemCurrency;
+          actual_local_date: string | null;
+          exchange_rate_to_usd: number;
+          /** Generated column — actual_local_amount * exchange_rate_to_usd */
+          actual_usd_computed: number | null;
+          /** Generated column — budget_usd - actual_usd_computed */
+          surplus_usd: number | null;
+          projected_cost: number | null;
+          mr_no: string | null;
+          po_no: string | null;
+          remarks: string | null;
+          status: LineItemStatus;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<
-          Database["public"]["Tables"]["line_items"]["Row"],
-          "id" | "created_at" | "updated_at"
-        > & {
+        Insert: {
           id?: string;
+          annexure_id?: string | null;
+          sr_no?: number | null;
+          material_code?: string | null;
+          area?: string | null;
+          description: string;
+          work_by?: string | null;
+          budget_usd?: number;
+          actual_local_amount?: number | null;
+          actual_local_currency?: LineItemCurrency;
+          actual_local_date?: string | null;
+          exchange_rate_to_usd?: number;
+          projected_cost?: number | null;
+          mr_no?: string | null;
+          po_no?: string | null;
+          remarks?: string | null;
+          status?: LineItemStatus;
           created_at?: string;
           updated_at?: string;
         };
@@ -145,40 +142,37 @@ export interface Database {
       purchase_orders: {
         Row: {
           id: string;
+          project_id: string | null;
+          line_item_id: string | null;
           po_number: string;
-          rig_id: string;
-          project_id: string;
-          annexure_id: string;
           vendor_name: string;
-          vendor_address: string | null;
-          vendor_contact: string | null;
-          vendor_email: string | null;
-          vendor_gstin: string | null;
-          currency: string;
-          subtotal: number;
-          tax_pct: number;
-          tax_amount: number;
-          freight: number;
-          total: number;
-          total_usd: number;
-          payment_terms: string;
-          delivery_terms: string;
-          delivery_location: string;
-          required_by: string;
-          status: string;
-          raised_by: string;
+          description: string | null;
+          amount_usd: number | null;
+          local_amount: number | null;
+          local_currency: string;
+          exchange_rate: number;
+          status: POStatus;
+          pdf_url: string | null;
+          created_by: string | null;
           approved_by: string | null;
-          approved_at: string | null;
-          issued_at: string | null;
-          notes: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<
-          Database["public"]["Tables"]["purchase_orders"]["Row"],
-          "id" | "created_at" | "updated_at"
-        > & {
+        Insert: {
           id?: string;
+          project_id?: string | null;
+          line_item_id?: string | null;
+          po_number: string;
+          vendor_name: string;
+          description?: string | null;
+          amount_usd?: number | null;
+          local_amount?: number | null;
+          local_currency?: string;
+          exchange_rate?: number;
+          status?: POStatus;
+          pdf_url?: string | null;
+          created_by?: string | null;
+          approved_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -187,18 +181,46 @@ export interface Database {
       exchange_rates: {
         Row: {
           id: string;
-          base: string;
-          quote: string;
+          base_currency: string;
+          target_currency: string;
           rate: number;
-          effective_at: string;
+          rate_date: string;
           source: string;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["exchange_rates"]["Row"], "id" | "created_at"> & {
+        Insert: {
           id?: string;
+          base_currency: string;
+          target_currency: string;
+          rate: number;
+          rate_date: string;
+          source?: string;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["exchange_rates"]["Insert"]>;
+      };
+      profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          email: string | null;
+          role: ProfileRole;
+          assigned_rig_id: string | null;
+          avatar_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          full_name?: string | null;
+          email?: string | null;
+          role?: ProfileRole;
+          assigned_rig_id?: string | null;
+          avatar_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };
     };
     Views: Record<string, never>;
@@ -206,3 +228,12 @@ export interface Database {
     Enums: Record<string, never>;
   };
 }
+
+// Convenience aliases for hook consumers
+export type DbRig = Database["public"]["Tables"]["rigs"]["Row"];
+export type DbProject = Database["public"]["Tables"]["projects"]["Row"];
+export type DbAnnexure = Database["public"]["Tables"]["annexures"]["Row"];
+export type DbLineItem = Database["public"]["Tables"]["line_items"]["Row"];
+export type DbPurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
+export type DbExchangeRate = Database["public"]["Tables"]["exchange_rates"]["Row"];
+export type DbProfile = Database["public"]["Tables"]["profiles"]["Row"];

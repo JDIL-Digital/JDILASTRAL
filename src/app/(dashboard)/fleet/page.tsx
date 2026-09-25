@@ -12,11 +12,13 @@ import {
   CardSkeleton,
   RigCardSkeleton,
 } from "@/components/ui/Skeletons";
-import { useRigs } from "@/hooks/useRig";
+import { QueryError, EmptyState } from "@/components/ui/ErrorBoundary";
+import { useRigs } from "@/hooks/useRigs";
+import { useFleetStats } from "@/hooks/useFleetStats";
 import { APP, BRAND } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
+import type { DbRig } from "@/types/database";
 
-/* ----- Dynamic chart imports — kept off the initial bundle for fast TTI ----- */
 const BudgetDonutChart = dynamic(
   () => import("@/components/charts/BudgetDonutChart").then((m) => m.BudgetDonutChart),
   { ssr: false, loading: () => <DonutSkeleton /> },
@@ -27,49 +29,30 @@ const SpendTrendLine = dynamic(
 );
 
 export default function FleetPage() {
-  const { rigs, loading } = useRigs();
+  const { rigs, loading: rigsLoading, error: rigsError, refresh: refreshRigs } = useRigs();
+  const { stats, loading: statsLoading, error: statsError, refresh: refreshStats } =
+    useFleetStats();
   const [now, setNow] = useState<Date | null>(null);
 
-  // Live clock — tick every second client-side, never run during SSR.
   useEffect(() => {
     setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const aggregate = useMemo(() => {
-    const budget = rigs.reduce((acc, r) => acc + r.total_budget_usd, 0);
-    const spent = rigs.reduce((acc, r) => acc + r.spent_usd, 0);
-    const committed = rigs.reduce((acc, r) => acc + r.committed_usd, 0);
-    const utilization = rigs.length
-      ? rigs.reduce((acc, r) => acc + r.utilization_pct, 0) / rigs.length
-      : 0;
-    return { budget, spent, committed, utilization, remaining: budget - spent - committed };
-  }, [rigs]);
-
-  const burnPct = aggregate.budget ? (aggregate.spent / aggregate.budget) * 100 : 0;
-  const activeCount = rigs.filter((r) => r.status === "operational").length;
-
-  const donutData = useMemo(
-    () => [
-      { name: "Drilling Ops", value: aggregate.budget * 0.32, color: BRAND.primary },
-      { name: "Mud & Chemicals", value: aggregate.budget * 0.14, color: "#22C55E" },
-      { name: "Casing & Tubing", value: aggregate.budget * 0.18, color: BRAND.warning },
-      { name: "Logistics", value: aggregate.budget * 0.12, color: "#7C5CFF" },
-      { name: "HSE & Catering", value: aggregate.budget * 0.08, color: "#22B8CF" },
-      { name: "Other Annexures", value: aggregate.budget * 0.16, color: BRAND.danger },
-    ],
-    [aggregate.budget],
-  );
-
-  const trendData = useMemo(() => {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"];
-    return months.map((m, i) => ({
-      period: m,
-      spend: 18_000_000 + i * 4_200_000 + (i % 2 ? 1_500_000 : -750_000),
-      budget: 22_000_000 + i * 4_500_000,
+  const donutData = useMemo(() => {
+    if (!stats) return [];
+    return stats.budgetByAnnexure.slice(0, 6).map((a, i) => ({
+      name: a.name,
+      value: a.value,
+      color: [BRAND.primary, "#22C55E", BRAND.warning, "#7C5CFF", "#22B8CF", BRAND.danger][i % 6],
     }));
-  }, []);
+  }, [stats]);
+
+  const burnPct =
+    stats && stats.totalFleetBudget
+      ? (stats.totalActualSpend / stats.totalFleetBudget) * 100
+      : 0;
 
   return (
     <main className="flex-1 space-y-6 p-4 md:p-6">
@@ -85,8 +68,8 @@ export default function FleetPage() {
                 Fleet Operations Overview
               </h1>
               <p className="mt-1 max-w-xl text-sm text-brand-muted">
-                Real-time governance across all 6 offshore jackup rigs · live cost,
-                utilization, and procurement signals.
+                Real-time governance across all {rigs.length || 6} offshore jackup rigs · live
+                cost, utilization, and procurement signals.
               </p>
             </div>
             <div className="rounded-lg border border-brand-border bg-brand-bg/40 px-4 py-3 text-right backdrop-blur-sm">
@@ -116,9 +99,11 @@ export default function FleetPage() {
             </div>
           </div>
 
-          {/* KPI row — skeletons if data hasn't arrived (currently synchronous, but the
-              fallback keeps the layout from flashing once we re-introduce async fetch). */}
-          {loading ? (
+          {statsError && (
+            <QueryError message={statsError} onRetry={() => void refreshStats()} />
+          )}
+
+          {statsLoading || !stats ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <CardSkeleton key={i} />
@@ -128,8 +113,8 @@ export default function FleetPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <KPICard
                 label="Total Fleet Budget"
-                value={`$${formatCurrency(aggregate.budget, "USD").replace("$", "")}`}
-                numericValue={aggregate.budget}
+                value={`$${formatCurrency(stats.totalFleetBudget, "USD").replace("$", "")}`}
+                numericValue={stats.totalFleetBudget}
                 format={kpiFormatters.currencyCompact}
                 trend="up"
                 delta={4.2}
@@ -140,8 +125,8 @@ export default function FleetPage() {
               />
               <KPICard
                 label="YTD Spend"
-                value={`$${aggregate.spent}`}
-                numericValue={aggregate.spent}
+                value={`$${stats.totalActualSpend}`}
+                numericValue={stats.totalActualSpend}
                 format={kpiFormatters.currencyCompact}
                 trend="up"
                 delta={burnPct - 50}
@@ -156,25 +141,25 @@ export default function FleetPage() {
               />
               <KPICard
                 label="Fleet Utilization"
-                value={`${aggregate.utilization.toFixed(1)}%`}
-                numericValue={aggregate.utilization}
+                value={`${stats.fleetUtilization.toFixed(1)}%`}
+                numericValue={stats.fleetUtilization}
                 format={kpiFormatters.percent}
                 decimals={1}
                 trend="up"
                 delta={1.4}
                 intent="positive"
-                deltaLabel="this month"
+                deltaLabel={`${stats.activeRigs}/${stats.totalRigs} active`}
                 icon={<Activity className="h-5 w-5" />}
                 index={2}
               />
               <KPICard
                 label="Active Rigs"
-                value={`${activeCount} / ${rigs.length}`}
-                numericValue={activeCount}
-                format={(n) => `${Math.round(n)} / ${rigs.length}`}
+                value={`${stats.activeRigs} / ${stats.totalRigs}`}
+                numericValue={stats.activeRigs}
+                format={(n) => `${Math.round(n)} / ${stats.totalRigs}`}
                 trend="neutral"
                 intent="neutral"
-                hint={`${rigs.filter((r) => r.status === "maintenance").length} in maintenance`}
+                hint={`${stats.maintenanceRigs} maintenance · ${stats.standbyRigs} standby`}
                 icon={<Ship className="h-5 w-5" />}
                 index={3}
               />
@@ -191,21 +176,34 @@ export default function FleetPage() {
             <CardDescription>Fleet-wide budget breakdown</CardDescription>
           </CardHeader>
           <CardContent>
-            <BudgetDonutChart
-              data={donutData}
-              centerLabel="Budget"
-              centerValue={formatCurrency(aggregate.budget, "USD")}
-            />
+            {statsLoading || !stats ? (
+              <DonutSkeleton />
+            ) : donutData.length === 0 ? (
+              <EmptyState
+                title="No annexures yet"
+                message="Seed the annexures table to see the allocation breakdown."
+              />
+            ) : (
+              <BudgetDonutChart
+                data={donutData}
+                centerLabel="Budget"
+                centerValue={formatCurrency(stats.totalFleetBudget, "USD")}
+              />
+            )}
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-3 animate-fade-in-up delay-step-3">
           <CardHeader>
             <CardTitle>Monthly Spend Trend</CardTitle>
-            <CardDescription>YTD burn vs. plan across the fleet</CardDescription>
+            <CardDescription>YTD burn across the fleet</CardDescription>
           </CardHeader>
           <CardContent>
-            <SpendTrendLine data={trendData} />
+            {statsLoading || !stats ? (
+              <ChartSkeleton />
+            ) : (
+              <SpendTrendLine data={stats.monthlySpendTrend} />
+            )}
           </CardContent>
         </Card>
       </section>
@@ -218,23 +216,36 @@ export default function FleetPage() {
               Fleet Composition
             </h2>
             <p className="text-sm text-brand-muted">
-              {rigs.length} jackup rigs · click any unit to drill in
+              {rigs.length} jackup rig{rigs.length === 1 ? "" : "s"} · click any unit to drill in
             </p>
           </div>
-          <span className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs text-brand-muted">
-            {activeCount} Active · {rigs.filter((r) => r.status === "maintenance").length} Maint.
-          </span>
+          {stats && (
+            <span className="rounded-full border border-brand-border bg-brand-surface px-3 py-1 text-xs text-brand-muted">
+              {stats.activeRigs} Active · {stats.maintenanceRigs} Maint. · {stats.standbyRigs} Standby
+            </span>
+          )}
         </div>
-        {loading ? (
+
+        {rigsError && (
+          <QueryError message={rigsError} onRetry={() => void refreshRigs()} />
+        )}
+
+        {rigsLoading ? (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <RigCardSkeleton key={i} />
             ))}
           </div>
+        ) : rigs.length === 0 ? (
+          <EmptyState
+            title="No rigs configured"
+            message="Run supabase/migrations/001_initial_schema.sql to seed the fleet."
+          />
         ) : (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {rigs.map((rig, i) => (
-              <RigCard key={rig.id} rig={rig} index={i} />
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <RigCard key={rig.id} rig={dbRigToUiRig(rig) as any} index={i} />
             ))}
           </div>
         )}
@@ -243,9 +254,38 @@ export default function FleetPage() {
   );
 }
 
-/* ---------------------------------------------------------------------------
-   Hero background — three slow-drifting blurred blobs + radial mesh
---------------------------------------------------------------------------- */
+/**
+ * Bridge Supabase's `rigs` row into the shape the existing `RigCard`
+ * component expects. Fills in the fields the card renders but the DB
+ * doesn't carry (contract dates, day rate, utilization, budgets) with
+ * neutral placeholders — those live in projects/line_items and will get
+ * wired in a follow-up pass.
+ */
+function dbRigToUiRig(rig: DbRig) {
+  return {
+    id: rig.id,
+    name: rig.name,
+    type: rig.type ?? "Jackup",
+    location: "Mumbai High",
+    operator: "ONGC",
+    status:
+      rig.status === "active"
+        ? ("operational" as const)
+        : rig.status === "maintenance"
+          ? ("maintenance" as const)
+          : ("stacked" as const),
+    daily_rate_usd: 85_000,
+    contract_start: rig.created_at,
+    contract_end: rig.created_at,
+    total_budget_usd: 0,
+    spent_usd: 0,
+    committed_usd: 0,
+    utilization_pct: rig.status === "active" ? 88 : rig.status === "maintenance" ? 42 : 12,
+    created_at: rig.created_at,
+    updated_at: rig.created_at,
+  };
+}
+
 function HeroBackground() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">

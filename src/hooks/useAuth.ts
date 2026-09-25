@@ -63,6 +63,7 @@ export function useAuth(): AuthState {
     (async () => {
       try {
         const client = getSupabaseBrowserClient();
+        if (!client) return;
         const result = await withTimeout(client.auth.getUser(), SIGNIN_TIMEOUT_MS);
         if (!mounted) return;
         if (result !== "__timeout__" && result.data.user) {
@@ -111,6 +112,7 @@ export function useAuth(): AuthState {
       // within a few hundred ms.
       try {
         const client = getSupabaseBrowserClient();
+        if (!client) return { error: null }; // stay on demo — env not configured
         const result = await withTimeout(
           client.auth.signInWithPassword({ email, password }),
           SIGNIN_TIMEOUT_MS,
@@ -140,7 +142,9 @@ export function useAuth(): AuthState {
   const signOut = useCallback(async () => {
     try {
       const client = getSupabaseBrowserClient();
-      await withTimeout(client.auth.signOut(), 1500);
+      if (client) {
+        await withTimeout(client.auth.signOut(), 1500);
+      }
     } catch {
       /* ignore */
     }
