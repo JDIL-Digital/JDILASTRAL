@@ -1,17 +1,23 @@
 /**
- * Server Supabase client — uses @supabase/ssr.
+ * Server Supabase client — @supabase/ssr for Next 16.
  *
  * Use this from Server Components, Route Handlers, and Server Actions.
- * The cookie adapter wires Supabase's auth tokens through Next.js's
- * cookies() API so SSR can read sessions established in the browser.
+ * In Next 16, `cookies()` from `next/headers` is asynchronous — every
+ * factory below is `async` accordingly.
  *
- * NEVER import this file from a "use client" module — it depends on
- * `next/headers`, which is server-only.
+ * NEVER import from a "use client" module — depends on `next/headers`,
+ * which is server-only.
  */
 
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@/types/database";
+
+interface CookieToSet {
+  name: string;
+  value: string;
+  options: CookieOptions;
+}
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
@@ -30,55 +36,49 @@ function assertEnv() {
 }
 
 /**
- * Use inside Server Components (RSC). The cookieStore is read-only here,
- * so set/remove are no-ops — Supabase will refresh tokens via the
- * middleware/route-handler clients instead.
+ * For use inside Server Components (RSC). In RSC the cookieStore is
+ * read-only — `setAll` swallows write errors so Supabase can still
+ * attempt token refresh without crashing the render.
  */
-export function getSupabaseServerClient() {
+export async function getSupabaseServerClient() {
   assertEnv();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(_name: string, _value: string, _options: CookieOptions) {
-        // RSC has no write access to cookies — intentional no-op.
-      },
-      remove(_name: string, _options: CookieOptions) {
-        // RSC has no write access to cookies — intentional no-op.
+      setAll(cookiesToSet: CookieToSet[]) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
+        } catch {
+          /* Server Component render — writes not allowed. */
+        }
       },
     },
   });
 }
 
 /**
- * Use inside Route Handlers and Server Actions. Cookies are writable
- * here, so Supabase can refresh and persist new auth tokens.
+ * For use inside Route Handlers and Server Actions — where cookies are
+ * writable and Supabase can refresh & persist new auth tokens.
  */
-export function getSupabaseRouteClient() {
+export async function getSupabaseRouteClient() {
   assertEnv();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value, ...options });
-        } catch {
-          // Called from a Server Component context — skip silently.
-        }
-      },
-      remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: "", ...options });
-        } catch {
-          // Called from a Server Component context — skip silently.
-        }
+      setAll(cookiesToSet: CookieToSet[]) {
+        cookiesToSet.forEach(({ name, value, options }) =>
+          cookieStore.set(name, value, options),
+        );
       },
     },
   });

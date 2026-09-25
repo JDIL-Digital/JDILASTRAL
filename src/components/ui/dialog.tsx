@@ -43,16 +43,18 @@ function useDialog() {
   return ctx;
 }
 
+type ClickableProps = { onClick?: (e: React.MouseEvent) => void };
+
 export function DialogTrigger({
   children,
   asChild,
 }: {
-  children: React.ReactElement;
+  children: React.ReactElement<ClickableProps>;
   asChild?: boolean;
 }) {
   const { setOpen } = useDialog();
   if (asChild) {
-    return React.cloneElement(children, {
+    return React.cloneElement<ClickableProps>(children, {
       onClick: (e: React.MouseEvent) => {
         children.props.onClick?.(e);
         setOpen(true);
@@ -141,9 +143,13 @@ export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLD
   );
 }
 
-export function DialogClose({ children }: { children: React.ReactElement }) {
+export function DialogClose({
+  children,
+}: {
+  children: React.ReactElement<ClickableProps>;
+}) {
   const { setOpen } = useDialog();
-  return React.cloneElement(children, {
+  return React.cloneElement<ClickableProps>(children, {
     onClick: (e: React.MouseEvent) => {
       children.props.onClick?.(e);
       setOpen(false);
