@@ -68,6 +68,8 @@ interface EditableLineItemsTableProps {
   onUpdate: (id: string, patch: Partial<DbLineItem>) => Promise<DbLineItem | null>;
   onDelete: (id: string) => Promise<boolean>;
   onGeneratePO?: (item: DbLineItem) => void;
+  /** Called when the operator clicks "Generate PO for Selected" — receives the selected rows. */
+  onBulkGeneratePO?: (items: DbLineItem[]) => void;
 }
 
 interface CellCoord {
@@ -102,6 +104,7 @@ export function EditableLineItemsTable({
   onUpdate,
   onDelete,
   onGeneratePO,
+  onBulkGeneratePO,
 }: EditableLineItemsTableProps) {
   const toast = useToast();
 
@@ -110,7 +113,37 @@ export function EditableLineItemsTable({
   const [saveState, setSaveState] = React.useState<Record<string, SaveState>>({});
   const [fxLoading, setFxLoading] = React.useState<Record<string, boolean>>({});
   const [editing, setEditing] = React.useState<CellCoord | null>(null);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const saveTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Keep the selection in sync with the rows that still exist.
+  React.useEffect(() => {
+    setSelected((prev) => {
+      const next = new Set<string>();
+      items.forEach((i) => {
+        if (prev.has(i.id)) next.add(i.id);
+      });
+      return next;
+    });
+  }, [items]);
+
+  const toggleRow = React.useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = React.useCallback(() => {
+    setSelected((prev) =>
+      prev.size === items.length ? new Set() : new Set(items.map((i) => i.id)),
+    );
+  }, [items]);
+
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const someSelected = selected.size > 0 && selected.size < items.length;
 
   // Resolve the "live view" of a row — merge the persisted row with any pending draft.
   const view = React.useCallback(
@@ -266,12 +299,54 @@ export function EditableLineItemsTable({
 
   return (
     <div className="overflow-hidden rounded-xl border border-brand-border bg-brand-surface">
+      {/* ---------- Bulk-selection action bar ---------- */}
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between gap-3 border-b border-brand-green/40 bg-brand-green/10 px-4 py-2">
+          <span className="text-xs font-semibold text-brand-green">
+            {selected.size} row{selected.size === 1 ? "" : "s"} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="rounded-md px-2 py-1 text-xs text-brand-muted hover:bg-brand-border/40 hover:text-brand-text"
+            >
+              Clear selection
+            </button>
+            {onBulkGeneratePO && (
+              <button
+                type="button"
+                onClick={() =>
+                  onBulkGeneratePO(items.filter((i) => selected.has(i.id)))
+                }
+                className="inline-flex items-center gap-1 rounded-md bg-brand-green px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-green/90"
+              >
+                <FileText className="h-3 w-3" />
+                Generate PO for Selected
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1400px] text-sm">
+        <table className="w-full min-w-[1460px] text-sm">
           <thead className="sticky top-0 z-10 bg-brand-bg/90 backdrop-blur">
             <tr className="text-xs uppercase tracking-wider text-brand-muted">
-              <Th sticky left={0} className="w-14 text-center">#</Th>
-              <Th sticky left={56} className="min-w-[260px]">Description</Th>
+              <Th className="w-10 text-center">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={toggleAll}
+                  className="h-3.5 w-3.5 accent-brand-green"
+                />
+              </Th>
+              <Th sticky left={40} className="w-14 text-center">#</Th>
+              <Th sticky left={96} className="min-w-[260px]">Description</Th>
               <Th>Code</Th>
               <Th>Area</Th>
               <Th>Work By</Th>
@@ -299,13 +374,26 @@ export function EditableLineItemsTable({
               return (
                 <tr
                   key={row.id}
-                  className="group border-b border-brand-border transition-colors hover:bg-brand-border/20"
+                  className={cn(
+                    "group border-b border-brand-border transition-colors hover:bg-brand-border/20",
+                    selected.has(row.id) && "bg-brand-green/5",
+                  )}
                 >
-                  <Td sticky left={0} className="w-14 text-center font-mono text-xs text-brand-muted">
+                  <Td className="w-10 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select row ${idx + 1}`}
+                      checked={selected.has(row.id)}
+                      onChange={() => toggleRow(row.id)}
+                      className="h-3.5 w-3.5 accent-brand-green"
+                    />
+                  </Td>
+
+                  <Td sticky left={40} className="w-14 text-center font-mono text-xs text-brand-muted">
                     {idx + 1}
                   </Td>
 
-                  <Td sticky left={56} className="min-w-[260px]">
+                  <Td sticky left={96} className="min-w-[260px]">
                     <EditableTextCell
                       row={row}
                       field="description"
@@ -444,16 +532,26 @@ export function EditableLineItemsTable({
                   </Td>
 
                   <Td>
-                    <EditableTextCell
-                      row={row}
-                      field="po_no"
-                      value={v.po_no ?? ""}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onChange={(val) => setField(row, "po_no", val)}
-                      onNavigate={moveFocus}
-                      className="font-mono text-xs"
-                    />
+                    {v.po_no ? (
+                      <a
+                        href={`/purchase-orders?search=${encodeURIComponent(v.po_no)}`}
+                        className="font-mono text-xs text-brand-green hover:underline"
+                        title={`Open PO ${v.po_no}`}
+                      >
+                        {v.po_no}
+                      </a>
+                    ) : (
+                      <EditableTextCell
+                        row={row}
+                        field="po_no"
+                        value={v.po_no ?? ""}
+                        editing={editing}
+                        setEditing={setEditing}
+                        onChange={(val) => setField(row, "po_no", val)}
+                        onNavigate={moveFocus}
+                        className="font-mono text-xs"
+                      />
+                    )}
                   </Td>
 
                   <Td>
@@ -520,7 +618,7 @@ export function EditableLineItemsTable({
 
             {items.length === 0 && (
               <tr>
-                <td colSpan={17} className="p-10 text-center text-sm text-brand-muted">
+                <td colSpan={18} className="p-10 text-center text-sm text-brand-muted">
                   No line items yet. Click <span className="font-semibold">Add Row</span> to create one.
                 </td>
               </tr>
@@ -530,10 +628,11 @@ export function EditableLineItemsTable({
           {items.length > 0 && (
             <tfoot className="sticky bottom-0 bg-brand-bg/95 backdrop-blur">
               <tr className="border-t-2 border-brand-green/40">
-                <Td sticky left={0} className="w-14 text-center font-bold text-brand-muted">
+                <Td className="w-10" />
+                <Td sticky left={40} className="w-14 text-center font-bold text-brand-muted">
                   Σ
                 </Td>
-                <Td sticky left={56} className="font-semibold uppercase tracking-wider text-brand-muted">
+                <Td sticky left={96} className="font-semibold uppercase tracking-wider text-brand-muted">
                   Totals ({items.length} items)
                 </Td>
                 <Td colSpan={3} />

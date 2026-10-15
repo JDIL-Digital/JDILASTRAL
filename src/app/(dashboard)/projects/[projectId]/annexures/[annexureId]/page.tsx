@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronRight, Download, FileText, Loader2, Plus } from "lucide-react";
+import { ChevronRight, Download, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KPICard } from "@/components/cards/KPICard";
 import { TableSkeleton } from "@/components/ui/Skeletons";
@@ -215,10 +215,14 @@ export default function AnnexurePage() {
           onUpdate={async (id, patch) => updateLineItem(id, patch)}
           onDelete={async (id) => deleteLineItem(id)}
           onGeneratePO={handleGeneratePO}
+          onBulkGeneratePO={(rows) => {
+            setPoLineItems(rows);
+            setPoOpen(true);
+          }}
         />
       )}
 
-      {/* -------- PO modal (opened from row action) -------- */}
+      {/* -------- PO modal (opened from row action or bulk selection) -------- */}
       <POGeneratorModal
         open={poOpen}
         onOpenChange={setPoOpen}
@@ -230,22 +234,8 @@ export default function AnnexurePage() {
         annexureId={annexure.id}
         raisedById={user?.id ?? "demo-user"}
         raisedByName={user?.full_name ?? "Demo User"}
+        onCreated={() => void refreshLineItems()}
       />
-
-      {/* Small floating generator for bulk PO on the whole annexure */}
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setPoLineItems(lineItems.filter((li) => li.status !== "overrun"));
-            setPoOpen(true);
-          }}
-          disabled={lineItems.length === 0}
-        >
-          <FileText className="h-4 w-4" /> Generate PO for all eligible rows
-        </Button>
-      </div>
     </main>
   );
 }
