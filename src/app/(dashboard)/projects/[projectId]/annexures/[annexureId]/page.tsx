@@ -1,149 +1,173 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import dynamic from "next/dynamic";
-import { ChevronRight, FileText, Plus } from "lucide-react";
+import { ChevronRight, Download, FileText, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/cards/KPICard";
-import { LineItemsTable } from "@/components/tables/LineItemsTable";
-import {
-  ChartSkeleton,
-  DonutSkeleton,
-  TableSkeleton,
-} from "@/components/ui/Skeletons";
-import { QueryError, EmptyState } from "@/components/ui/ErrorBoundary";
+import { TableSkeleton } from "@/components/ui/Skeletons";
+import { QueryError } from "@/components/ui/ErrorBoundary";
+import { EditableLineItemsTable } from "@/components/tables/EditableLineItemsTable";
+import { AnnexureTabs } from "@/components/annexures/AnnexureTabs";
 import { POGeneratorModal } from "@/components/po/POGeneratorModal";
-import { useAnnexure } from "@/hooks/useAnnexures";
+import { useAnnexures, useAnnexure } from "@/hooks/useAnnexures";
 import { useLineItems } from "@/hooks/useLineItems";
-import { useRig } from "@/hooks/useRig";
+import { useProjects } from "@/hooks/useProjects";
 import { useAuth } from "@/hooks/useAuth";
-import { BRAND } from "@/lib/constants";
+import { useToast } from "@/components/ui/Toast";
+import { exportAnnexureToXlsx } from "@/lib/excel/exportAnnexure";
 import { formatCompact, formatCurrency } from "@/lib/utils";
-import type { LineItemStatus } from "@/types/database";
+import type { DbLineItem } from "@/types/database";
 
-const BudgetDonutChart = dynamic(
-  () => import("@/components/charts/BudgetDonutChart").then((m) => m.BudgetDonutChart),
-  { ssr: false, loading: () => <DonutSkeleton /> },
-);
-
-const STATUSES: LineItemStatus[] = ["pending", "on-track", "watch", "overrun"];
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 
 export default function AnnexurePage() {
   const params = useParams<{ projectId: string; annexureId: string }>();
   const projectId = params.projectId;
   const annexureId = params.annexureId;
 
-  const { annexure, loading: annexureLoading, error: annexureError } = useAnnexure(
-    projectId,
-    annexureId,
-  );
+  const { projects } = useProjects();
+  const currentProject = projects.find((p) => p.id === projectId) ?? null;
+
+  const {
+    annexures,
+    loading: annexuresLoading,
+    error: annexuresError,
+    refresh: refreshAnnexures,
+  } = useAnnexures(projectId);
+  const { annexure } = useAnnexure(projectId, annexureId);
+
   const {
     lineItems,
     loading: lineItemsLoading,
     error: lineItemsError,
     refresh: refreshLineItems,
+    addLineItem,
+    updateLineItem,
+    deleteLineItem,
   } = useLineItems(annexure?.id ?? null);
+
   const { user } = useAuth();
-
-  // Rig name is best-effort: we don't know the rig id from the URL, so
-  // we hand off the project id and let useRig show a friendly title only
-  // once the annexure loads. If your URL scheme includes the rig, wire
-  // it in here.
-  const { rig } = useRig(projectId);
-
+  const toast = useToast();
   const [poOpen, setPoOpen] = useState(false);
+  const [poLineItems, setPoLineItems] = useState<DbLineItem[]>([]);
+  const [adding, setAdding] = useState(false);
 
   const totals = useMemo(() => {
-    const byStatus: Record<LineItemStatus, { count: number; total: number }> = {
-      pending: { count: 0, total: 0 },
-      "on-track": { count: 0, total: 0 },
-      watch: { count: 0, total: 0 },
-      overrun: { count: 0, total: 0 },
-    };
-
     let budget = 0;
     let actual = 0;
-
     lineItems.forEach((li) => {
       budget += Number(li.budget_usd ?? 0);
-      const rowActual = Number(li.actual_usd_computed ?? 0);
-      actual += rowActual;
-      const bucket = byStatus[li.status];
-      if (bucket) {
-        bucket.count += 1;
-        bucket.total += rowActual;
-      }
+      actual += Number(li.actual_usd_computed ?? 0);
     });
-
-    const totalBudget = annexure?.total_budget || annexure?.budget_usd || budget;
+    const annexureBudget = Number(annexure?.budget_usd ?? budget);
     return {
-      budget: totalBudget,
+      budget: annexureBudget,
       actual,
-      committed: byStatus["on-track"].total,
-      remaining: Math.max(0, totalBudget - actual),
-      byStatus,
+      remaining: annexureBudget - actual,
     };
   }, [lineItems, annexure]);
 
-  if (annexureError) {
+  const handleAddRow = useCallback(async () => {
+    if (!annexure) return;
+    setAdding(true);
+    try {
+      const nextSrNo =
+        (lineItems.reduce((max, li) => Math.max(max, li.sr_no ?? 0), 0) ?? 0) + 1;
+      await addLineItem({
+        sr_no: nextSrNo,
+        description: "New line item",
+        budget_usd: 0,
+        actual_local_amount: 0,
+        actual_local_currency: "USD",
+        exchange_rate_to_usd: 1,
+        status: "pending",
+      });
+      toast.success("Row added");
+    } catch (e) {
+      toast.error("Add failed", e instanceof Error ? e.message : undefined);
+    } finally {
+      setAdding(false);
+    }
+  }, [addLineItem, annexure, lineItems, toast]);
+
+  const handleExport = useCallback(() => {
+    if (!annexure || !currentProject) return;
+    try {
+      exportAnnexureToXlsx({
+        annexureNumber: annexure.number,
+        annexureName: annexure.name,
+        projectName: currentProject.name,
+        rigName: currentProject.rigs?.name ?? "—",
+        items: lineItems,
+      });
+      toast.success("Excel exported");
+    } catch (e) {
+      toast.error("Export failed", e instanceof Error ? e.message : undefined);
+    }
+  }, [annexure, currentProject, lineItems, toast]);
+
+  const handleGeneratePO = useCallback((row: DbLineItem) => {
+    setPoLineItems([row]);
+    setPoOpen(true);
+  }, []);
+
+  if (annexuresError) {
     return (
       <main className="flex-1 p-6">
-        <QueryError message={annexureError} />
+        <QueryError message={annexuresError} onRetry={() => void refreshAnnexures()} />
       </main>
     );
   }
 
-  if (annexureLoading || !annexure) {
+  if (annexuresLoading || !annexure) {
     return (
       <main className="flex-1 space-y-6 p-4 md:p-6">
-        <TableSkeleton />
+        <TableSkeleton rows={6} columns={10} />
       </main>
     );
   }
 
+  const rigName = currentProject?.rigs?.name ?? "—";
+  const projectName = currentProject?.name ?? "Project";
+  const annexureRoman = ROMAN[annexure.number - 1] ?? String(annexure.number);
+  const remainingNegative = totals.remaining < 0;
+
   return (
-    <main className="flex-1 space-y-6 p-4 md:p-6">
+    <main className="flex-1 space-y-5 p-4 md:p-6">
+      {/* -------- Breadcrumb + title + actions -------- */}
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="flex items-center gap-1 text-xs text-brand-muted">
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-1 text-xs text-brand-muted">
             <Link href="/fleet" className="hover:text-brand-text">Fleet</Link>
-            {rig && (
-              <>
-                <ChevronRight className="h-3 w-3" />
-                <Link href={`/rig/${rig.id}`} className="hover:text-brand-text">
-                  {rig.name}
-                </Link>
-              </>
-            )}
             <ChevronRight className="h-3 w-3" />
-            <span className="font-mono font-medium text-brand-text">ANX-{annexure.number}</span>
+            <Link href="/projects" className="hover:text-brand-text">Projects</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="font-medium text-brand-text">{rigName}</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="font-medium text-brand-text">{projectName}</span>
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-brand-text md:text-3xl">
-            {annexure.name}
+            Ann. {annexureRoman} — {annexure.name}
           </h1>
           <p className="text-sm text-brand-muted">
-            {lineItems.length} line item{lineItems.length === 1 ? "" : "s"} · Budget{" "}
-            {formatCurrency(totals.budget, "USD")}
+            {lineItems.length} line item{lineItems.length === 1 ? "" : "s"} · live editing
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Plus className="h-4 w-4" /> Add Line Item
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={lineItems.length === 0}>
+            <Download className="h-4 w-4" /> Export Excel
           </Button>
-          <Button
-            onClick={() => setPoOpen(true)}
-            size="sm"
-            disabled={lineItems.length === 0}
-          >
-            <FileText className="h-4 w-4" /> Generate PO
+          <Button size="sm" onClick={handleAddRow} disabled={adding}>
+            {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Add Row
           </Button>
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* -------- Three KPI cards -------- */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KPICard
           label="Budget"
           value={`$${formatCompact(totals.budget)}`}
@@ -156,133 +180,72 @@ export default function AnnexurePage() {
           value={`$${formatCompact(totals.actual)}`}
           numericValue={totals.actual}
           format={(n) => `$${formatCompact(n)}`}
-          intent={totals.actual / totals.budget > 0.8 ? "negative" : "positive"}
+          intent={totals.actual / (totals.budget || 1) > 0.9 ? "negative" : "positive"}
           trend="up"
           delta={totals.budget ? (totals.actual / totals.budget) * 100 : 0}
           deltaLabel="of budget"
           index={1}
         />
         <KPICard
-          label="On Track"
-          value={`$${formatCompact(totals.committed)}`}
-          numericValue={totals.committed}
-          format={(n) => `$${formatCompact(n)}`}
-          hint={`${totals.byStatus["on-track"].count} lines`}
+          label="Remaining"
+          value={`${remainingNegative ? "-" : ""}$${formatCompact(Math.abs(totals.remaining))}`}
+          numericValue={Math.abs(totals.remaining)}
+          format={(n) => `${remainingNegative ? "-" : ""}$${formatCompact(n)}`}
+          intent={remainingNegative ? "negative" : "positive"}
+          hint={remainingNegative ? "Over budget" : "Available to commit"}
           index={2}
         />
-        <KPICard
-          label="Remaining"
-          value={`$${formatCompact(totals.remaining)}`}
-          numericValue={totals.remaining}
-          format={(n) => `$${formatCompact(n)}`}
-          intent={totals.remaining < totals.budget * 0.1 ? "negative" : "positive"}
-          hint="Available to commit"
-          index={3}
-        />
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation</CardTitle>
-            <CardDescription>Live annexure budget breakdown</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {lineItemsLoading ? (
-              <DonutSkeleton />
-            ) : (
-              <BudgetDonutChart
-                data={[
-                  { name: "Actual", value: totals.actual, color: BRAND.danger },
-                  { name: "On Track", value: totals.committed, color: BRAND.warning },
-                  { name: "Available", value: totals.remaining, color: BRAND.primary },
-                ]}
-                centerLabel="Budget"
-                centerValue={formatCurrency(totals.budget, "USD")}
-              />
-            )}
-          </CardContent>
-        </Card>
+      {/* -------- Tabs across all 11 annexures -------- */}
+      <AnnexureTabs
+        projectId={projectId}
+        annexures={annexures}
+        currentAnnexureId={annexure.id}
+      />
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Variance by Status</CardTitle>
-            <CardDescription>Line-item spend rolled up by status bucket</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {STATUSES.map((status) => {
-                const { count, total } = totals.byStatus[status];
-                const pct = totals.budget ? (total / totals.budget) * 100 : 0;
-                return (
-                  <div key={status}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="capitalize text-brand-muted">
-                        {status} ({count})
-                      </span>
-                      <span className="font-mono text-brand-text">
-                        ${formatCompact(total)} · {pct.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-brand-border/40">
-                      <div
-                        className={
-                          status === "overrun"
-                            ? "h-full rounded-full bg-brand-danger"
-                            : status === "watch"
-                              ? "h-full rounded-full bg-brand-warning"
-                              : "h-full rounded-full bg-brand-green"
-                        }
-                        style={{ width: `${Math.min(pct, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Line Items</CardTitle>
-          <CardDescription>
-            {annexure.name} — procurement detail, live from Supabase
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {lineItemsError ? (
-            <QueryError message={lineItemsError} onRetry={() => void refreshLineItems()} />
-          ) : lineItemsLoading ? (
-            <TableSkeleton />
-          ) : lineItems.length === 0 ? (
-            <EmptyState
-              title="No line items yet"
-              message="Insert rows into public.line_items for this annexure to populate the table."
-            />
-          ) : (
-            <LineItemsTable items={lineItems} />
-          )}
-        </CardContent>
-      </Card>
-
-      {rig && (
-        <POGeneratorModal
-          open={poOpen}
-          onOpenChange={setPoOpen}
-          lineItems={lineItems.filter(
-            (li) => li.status === "pending" || li.status === "on-track",
-          )}
-          rigName={rig.name}
-          projectName={`${rig.name} Program`}
-          annexureName={annexure.name}
-          projectId={projectId}
-          annexureId={annexure.id}
-          raisedById={user?.id ?? "demo-user"}
-          raisedByName={user?.full_name ?? "Demo User"}
+      {/* -------- Editable table -------- */}
+      {lineItemsError ? (
+        <QueryError message={lineItemsError} onRetry={() => void refreshLineItems()} />
+      ) : lineItemsLoading ? (
+        <TableSkeleton rows={8} columns={15} />
+      ) : (
+        <EditableLineItemsTable
+          items={lineItems}
+          onUpdate={async (id, patch) => updateLineItem(id, patch)}
+          onDelete={async (id) => deleteLineItem(id)}
+          onGeneratePO={handleGeneratePO}
         />
       )}
+
+      {/* -------- PO modal (opened from row action) -------- */}
+      <POGeneratorModal
+        open={poOpen}
+        onOpenChange={setPoOpen}
+        lineItems={poLineItems}
+        rigName={rigName}
+        projectName={projectName}
+        annexureName={annexure.name}
+        projectId={projectId}
+        annexureId={annexure.id}
+        raisedById={user?.id ?? "demo-user"}
+        raisedByName={user?.full_name ?? "Demo User"}
+      />
+
+      {/* Small floating generator for bulk PO on the whole annexure */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setPoLineItems(lineItems.filter((li) => li.status !== "overrun"));
+            setPoOpen(true);
+          }}
+          disabled={lineItems.length === 0}
+        >
+          <FileText className="h-4 w-4" /> Generate PO for all eligible rows
+        </Button>
+      </div>
     </main>
   );
 }
