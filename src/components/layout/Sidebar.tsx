@@ -18,7 +18,9 @@ import { cn, slugify } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects } from "@/hooks/useProjects";
 import { useAnnexures } from "@/hooks/useAnnexures";
+import { useRigs } from "@/hooks/useRigs";
 import { rigMetaFor } from "@/lib/rigMeta";
+import type { DbRig } from "@/types/database";
 
 const NAV = [
   { href: "/fleet", label: "Fleet Overview", icon: LayoutDashboard },
@@ -33,6 +35,7 @@ export function Sidebar() {
   const router = useRouter();
   const { user, profile, role, signOut, isAuthenticated } = useAuth();
   const { projects } = useProjects();
+  const { rigs: dbRigs } = useRigs();
 
   // Role is already resolved by useAuth (profile.role → default 'engineer').
   // Display name prefers profile.full_name, then the Supabase user's email.
@@ -40,14 +43,28 @@ export function Sidebar() {
   const displayName =
     profile?.full_name ?? user?.email ?? "Guest User";
 
+  // Prefer real DB rig rows (with UUIDs) over the hardcoded slug list.
+  // Falls back to the slug list only when the DB hasn't returned yet,
+  // so the sidebar always has something to render.
+  const rigList: Array<{ key: string; id: string; name: string; status: DbRig["status"] | null }> =
+    dbRigs.length > 0
+      ? dbRigs.map((r) => ({ key: r.id, id: r.id, name: r.name, status: r.status }))
+      : RIGS.map((name) => ({
+          key: name,
+          id: slugify(name),
+          name,
+          status: null,
+        }));
+
   // Aggressively prefetch every primary route on mount so subsequent
   // clicks navigate instantly with no extra round-trip.
   useEffect(() => {
     const main = ["/fleet", "/projects", "/purchase-orders", "/admin", "/admin/bc-sync"];
     main.forEach((r) => router.prefetch(r));
-    RIGS.forEach((name) => router.prefetch(`/rig/${slugify(name)}`));
+    rigList.forEach((r) => router.prefetch(`/rig/${r.id}`));
     projects.forEach((p) => router.prefetch(`/projects/${p.id}/annexures/`));
-  }, [router, projects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, projects, dbRigs.length]);
 
   const initials = displayName
     ? displayName
@@ -154,14 +171,33 @@ export function Sidebar() {
 
         <p className="mt-6 px-3 pb-2 text-label">Rigs</p>
         <ul className="space-y-1">
-          {RIGS.map((name, i) => {
-            const slug = slugify(name);
-            const active = pathname.startsWith(`/rig/${slug}`);
-            const meta = rigMetaFor(name);
+          {rigList.map((rig, i) => {
+            // Prefer the live DB status when available; fall back to the
+            // display-metadata derived from the hardcoded names.
+            const metaByName = rigMetaFor(rig.name as (typeof RIGS)[number]);
+            const dbStatus = rig.status;
+            const uiStatus =
+              dbStatus === "active"
+                ? "active"
+                : dbStatus === "maintenance"
+                  ? "maintenance"
+                  : dbStatus === "standby"
+                    ? "standby"
+                    : metaByName.status;
+            const statusDot =
+              uiStatus === "active"
+                ? "bg-brand-success"
+                : uiStatus === "maintenance"
+                  ? "bg-brand-warning"
+                  : "bg-slate-400";
+
+            // URL uses the DB UUID when we have it; falls back to the slug.
+            const href = `/rig/${rig.id}`;
+            const active = pathname.startsWith(href);
             return (
-              <li key={name}>
+              <li key={rig.key}>
                 <Link
-                  href={`/rig/${slug}`}
+                  href={href}
                   prefetch={true}
                   className={cn(
                     "group relative flex items-center gap-3 rounded-md py-2 pl-4 pr-3 text-sm transition-all duration-200",
@@ -172,7 +208,7 @@ export function Sidebar() {
                     `delay-step-${Math.min(7, i)}`,
                     "animate-fade-in",
                   )}
-                  title={`${name} · ${meta.statusLabel}`}
+                  title={`${rig.name} · ${uiStatus.toUpperCase()}`}
                 >
                   <span
                     aria-hidden
@@ -184,11 +220,11 @@ export function Sidebar() {
                   <span
                     className={cn(
                       "inline-block h-2 w-2 shrink-0 rounded-full",
-                      meta.statusDot,
-                      meta.status === "active" && "animate-pulse-dot",
+                      statusDot,
+                      uiStatus === "active" && "animate-pulse-dot",
                     )}
                   />
-                  <span className="truncate">{name}</span>
+                  <span className="truncate">{rig.name}</span>
                 </Link>
               </li>
             );
