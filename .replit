@@ -1,11 +1,15 @@
-run = "node .next/standalone/server.js"
+# The leading `unset NODE_OPTIONS` strips the deployer-injected flag
+# (`--network-family-autoselection-attempt-timeout=…`) that Node 20
+# rejects as "not allowed in NODE_OPTIONS", breaking the server before
+# it binds a port.
+run = "unset NODE_OPTIONS && node .next/standalone/server.js"
 entrypoint = "src/app/page.tsx"
 
 [nix]
 channel = "stable-23_11"
 
 [deployment]
-run = ["sh", "-c", "npm run build && node .next/standalone/server.js"]
+run = ["sh", "-c", "unset NODE_OPTIONS && npm run build && node .next/standalone/server.js"]
 deploymentTarget = "cloudrun"
 
 [env]
