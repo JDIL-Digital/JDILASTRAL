@@ -22,7 +22,7 @@ import {
   CardSkeleton,
 } from "@/components/ui/Skeletons";
 import { QueryError, EmptyState } from "@/components/ui/ErrorBoundary";
-import { useRig } from "@/hooks/useRig";
+import { useRig } from "@/hooks/useRigs";
 import { useProjects } from "@/hooks/useProjects";
 import { useAnnexures } from "@/hooks/useAnnexures";
 import { BRAND } from "@/lib/constants";

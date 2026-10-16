@@ -31,8 +31,14 @@ const NAV = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, profile, role, signOut, isAuthenticated } = useAuth();
   const { projects } = useProjects();
+
+  // Role is already resolved by useAuth (profile.role → default 'engineer').
+  // Display name prefers profile.full_name, then the Supabase user's email.
+  const roleLabel = isAuthenticated ? ROLE_LABELS[role] : "Not signed in";
+  const displayName =
+    profile?.full_name ?? user?.email ?? "Guest User";
 
   // Aggressively prefetch every primary route on mount so subsequent
   // clicks navigate instantly with no extra round-trip.
@@ -43,8 +49,8 @@ export function Sidebar() {
     projects.forEach((p) => router.prefetch(`/projects/${p.id}/annexures/`));
   }, [router, projects]);
 
-  const initials = user?.full_name
-    ? user.full_name
+  const initials = displayName
+    ? displayName
         .split(" ")
         .map((p) => p[0])
         .filter(Boolean)
@@ -198,10 +204,10 @@ export function Sidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-semibold text-brand-text">
-              {user?.full_name ?? "Guest User"}
+              {displayName}
             </p>
             <p className="truncate text-[10px] uppercase tracking-wider text-brand-muted">
-              {user ? ROLE_LABELS[user.role] : "Not signed in"}
+              {roleLabel}
             </p>
           </div>
           <button

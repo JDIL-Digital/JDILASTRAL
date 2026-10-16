@@ -27,8 +27,10 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // signIn navigates eagerly to /fleet and resolves once the
-    // background Supabase check completes (or times out at 2.5s).
+    // signIn now strictly orders: Supabase auth → fetch profile → set
+    // state → router.push("/fleet"). Returns only after the push is
+    // scheduled, so the Signing-in spinner shows until the profile
+    // round-trip completes.
     const res = await signIn(email, password);
     if (res.error) {
       setLoading(false);

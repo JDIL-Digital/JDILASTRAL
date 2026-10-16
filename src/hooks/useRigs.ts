@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { registerRealtimeChannel } from "@/hooks/useRealtimeStatus";
 import type { DbRig } from "@/types/database";
 
 interface UseRigsResult {
@@ -12,11 +11,6 @@ interface UseRigsResult {
   refresh: () => Promise<void>;
 }
 
-/**
- * Fetches all rigs from public.rigs and subscribes to postgres_changes
- * so the fleet grid updates instantly when a rig row is inserted,
- * updated, or deleted.
- */
 export function useRigs(): UseRigsResult {
   const [rigs, setRigs] = useState<DbRig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,48 +23,109 @@ export function useRigs(): UseRigsResult {
       setLoading(false);
       return;
     }
-    try {
-      const { data, error: err } = await client
-        .from("rigs")
-        .select("*")
-        .order("name");
-      if (err) throw err;
-      setRigs(data ?? []);
+
+    const { data, error: err } = await client
+      .from("rigs")
+      .select("*")
+      .order("name");
+
+    if (err) {
+      console.error("[useRigs] error:", err);
+      setError(err.message);
+    } else {
+      console.log("[useRigs] loaded:", data?.length ?? 0);
+      setRigs(((data ?? []) as unknown) as DbRig[]);
       setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load rigs");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     void fetchRigs();
   }, [fetchRigs]);
 
-  // Realtime subscription
+  // Re-fetch when auth lands so RLS-blocked initial reads get replaced.
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     if (!client) return;
-
-    const channel = client
-      .channel("rigs-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "rigs" },
-        () => {
-          void fetchRigs();
-        },
-      )
-      .subscribe();
-
-    const unregister = registerRealtimeChannel("rigs");
-
-    return () => {
-      unregister();
-      void client.removeChannel(channel);
-    };
+    const { data } = client.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        void fetchRigs();
+      }
+    });
+    return () => data.subscription?.unsubscribe();
   }, [fetchRigs]);
 
   return { rigs, loading, error, refresh: fetchRigs };
+}
+
+interface UseRigResult {
+  rig: DbRig | null;
+  projectsCount: number;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Fetches one rig by id OR by slugified name. Both are supported because
+ * dashboard URLs use slugified names ("jindal-star"), not uuids.
+ */
+export function useRig(rigIdOrSlug: string): UseRigResult {
+  const [rig, setRig] = useState<DbRig | null>(null);
+  const [projectsCount, setProjectsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!rigIdOrSlug) {
+      setLoading(false);
+      return;
+    }
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      setError("Supabase not configured");
+      setLoading(false);
+      return;
+    }
+
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        rigIdOrSlug,
+      );
+
+    let query = client.from("rigs").select("*").limit(1);
+    if (isUuid) query = query.eq("id", rigIdOrSlug);
+    else query = query.ilike("name", rigIdOrSlug.replace(/-/g, " "));
+
+    const { data, error: err } = await query;
+    if (err) {
+      console.error("[useRig] error:", err);
+      setError(err.message);
+      setLoading(false);
+      return;
+    }
+
+    const row = (((data ?? []) as unknown) as DbRig[])[0] ?? null;
+    console.log("[useRig] loaded:", row?.name ?? "(not found)");
+    setRig(row);
+
+    if (row) {
+      const { count, error: countErr } = await client
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("rig_id", row.id);
+      if (countErr) console.warn("[useRig] projects count error:", countErr);
+      setProjectsCount(count ?? 0);
+    } else {
+      setProjectsCount(0);
+    }
+    setLoading(false);
+  }, [rigIdOrSlug]);
+
+  useEffect(() => {
+    void fetch();
+  }, [fetch]);
+
+  return { rig, projectsCount, loading, error, refresh: fetch };
 }

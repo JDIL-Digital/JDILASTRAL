@@ -29,12 +29,16 @@ interface TopBarProps {
 
 export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
   const pathname = usePathname() ?? "/";
-  const { user, signOut } = useAuth();
+  const { user, profile, role, signOut, isAuthenticated } = useAuth();
   const { theme, toggleTheme, mounted } = useTheme();
   const { live } = useRealtimeStatus();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWrapperRef = useRef<HTMLDivElement>(null);
   const derived = useMemo(() => breadcrumbs ?? breadcrumbsFromPath(pathname), [breadcrumbs, pathname]);
+
+  // Role resolved by useAuth; name from DB profile with email fallback.
+  const roleLabel = isAuthenticated ? ROLE_LABELS[role] : null;
+  const displayName = profile?.full_name ?? user?.email ?? null;
 
   // Close the user dropdown on outside-click / Escape.
   useEffect(() => {
@@ -53,8 +57,8 @@ export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
     };
   }, [menuOpen]);
 
-  const initials = user?.full_name
-    ? user.full_name
+  const initials = displayName
+    ? displayName
         .split(" ")
         .map((p) => p[0])
         .filter(Boolean)
@@ -189,7 +193,7 @@ export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label="User menu"
-            title={user?.full_name ?? "Account"}
+            title={displayName ?? "Account"}
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-all",
               menuOpen
@@ -212,11 +216,11 @@ export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-brand-text">
-                      {user?.full_name ?? "Account"}
+                      {displayName ?? "Account"}
                     </p>
-                    {user && (
+                    {roleLabel && (
                       <Badge variant="default" className="mt-1">
-                        {ROLE_LABELS[user.role]}
+                        {roleLabel}
                       </Badge>
                     )}
                   </div>

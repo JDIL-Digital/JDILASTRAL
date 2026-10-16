@@ -12,7 +12,7 @@ interface RoleGuardProps {
 }
 
 export function RoleGuard({ allow, fallback, children }: RoleGuardProps) {
-  const { user, loading } = useAuth();
+  const { isAuthenticated, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -22,7 +22,7 @@ export function RoleGuard({ allow, fallback, children }: RoleGuardProps) {
     );
   }
 
-  if (!user || !allow.includes(user.role)) {
+  if (!isAuthenticated || !allow.includes(role)) {
     if (fallback) return <>{fallback}</>;
     return (
       <Card className="border-brand-danger/40">

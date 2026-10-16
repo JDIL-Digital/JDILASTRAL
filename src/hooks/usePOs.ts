@@ -64,12 +64,30 @@ export function usePOs(projectId?: string | null): UsePOsResult {
     void fetchPOs();
   }, [fetchPOs]);
 
+  // Refetch once the auth session is established.
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { data } = client.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        void fetchPOs();
+      }
+    });
+    return () => data.subscription?.unsubscribe();
+  }, [fetchPOs]);
+
   // Realtime — PO status often changes via approval flows
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     if (!client) return;
+    // Per-mount nonce — see useLineItems for the full rationale.
+    const nonce =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : String(Math.random()).slice(2);
+
     const channel = client
-      .channel("purchase-orders-changes")
+      .channel(`purchase-orders-${nonce}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "purchase_orders" },

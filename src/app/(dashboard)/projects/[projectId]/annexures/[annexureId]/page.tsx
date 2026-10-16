@@ -48,7 +48,7 @@ export default function AnnexurePage() {
     deleteLineItem,
   } = useLineItems(annexure?.id ?? null);
 
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const toast = useToast();
   const [poOpen, setPoOpen] = useState(false);
   const [poLineItems, setPoLineItems] = useState<DbLineItem[]>([]);
@@ -233,7 +233,7 @@ export default function AnnexurePage() {
         projectId={projectId}
         annexureId={annexure.id}
         raisedById={user?.id ?? "demo-user"}
-        raisedByName={user?.full_name ?? "Demo User"}
+        raisedByName={profile?.full_name ?? user?.email ?? "Demo User"}
         onCreated={() => void refreshLineItems()}
       />
     </main>

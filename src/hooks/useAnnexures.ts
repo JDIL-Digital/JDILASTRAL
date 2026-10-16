@@ -31,6 +31,7 @@ export function useAnnexures(projectId: string | null | undefined): UseAnnexures
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // NOTE: no role gate — annexures are readable to every authenticated role.
   const fetchAnnexures = useCallback(async () => {
     if (!projectId) {
       setAnnexures([]);
@@ -85,6 +86,18 @@ export function useAnnexures(projectId: string | null | undefined): UseAnnexures
 
   useEffect(() => {
     void fetchAnnexures();
+  }, [fetchAnnexures]);
+
+  // Refetch once the auth session is established.
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { data } = client.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        void fetchAnnexures();
+      }
+    });
+    return () => data.subscription?.unsubscribe();
   }, [fetchAnnexures]);
 
   return useMemo(

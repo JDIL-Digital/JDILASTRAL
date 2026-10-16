@@ -31,6 +31,8 @@ export function useLineItems(annexureId: string | null | undefined): UseLineItem
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // NOTE: no role gate — line items are readable to every authenticated
+  // role. The only guard is the client existing.
   const fetchLineItems = useCallback(async () => {
     if (!annexureId) {
       setLineItems([]);
@@ -63,14 +65,39 @@ export function useLineItems(annexureId: string | null | undefined): UseLineItem
     void fetchLineItems();
   }, [fetchLineItems]);
 
+  // Refetch when the auth session is established so RLS-blocked initial
+  // reads get replaced with real data (fixes the "$0 after login" race).
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+    const { data } = client.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        void fetchLineItems();
+      }
+    });
+    return () => data.subscription?.unsubscribe();
+  }, [fetchLineItems]);
+
   // Realtime — subscribe only to changes for this annexure.
+  //
+  // The channel name has a per-mount random suffix. Without it, React 19
+  // strict-mode's double-mount would call .channel("line-items-X") twice,
+  // and Supabase's channel registry returns the SAME singleton for a given
+  // name — so the second .on() call fires on an already-subscribed instance
+  // and throws "cannot add postgres_changes callbacks after subscribe()".
+  // All .on() calls remain chained BEFORE .subscribe().
   useEffect(() => {
     if (!annexureId) return;
     const client = getSupabaseBrowserClient();
     if (!client) return;
 
+    const nonce =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : String(Math.random()).slice(2);
+
     const channel = client
-      .channel(`line-items-${annexureId}`)
+      .channel(`line-items-${annexureId}-${nonce}`)
       .on(
         "postgres_changes",
         {
