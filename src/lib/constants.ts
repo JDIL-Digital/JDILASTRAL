@@ -69,14 +69,29 @@ export type AnnexureName = (typeof ANNEXURES)[number];
 export const CURRENCIES = ["USD", "INR", "AED"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
-export const ROLES = ["engineer", "manager", "csuite"] as const;
+export const ROLES = ["engineer", "manager", "csuite", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  engineer: "Engineer",
-  manager: "Manager",
+  engineer: "Project Engineer",
+  manager: "Rig Manager",
   csuite: "C-Suite Executive",
+  admin: "Admin",
 };
+
+/** Emoji icon shown next to each role label in the sign-up dropdown. */
+export const ROLE_ICONS: Record<Role, string> = {
+  engineer: "🔧",
+  manager: "⚓",
+  csuite: "👔",
+  admin: "🛡️",
+};
+
+/**
+ * Email that unlocks the Admin role option in the sign-up dropdown.
+ * Everyone else only sees Engineer / Manager / C-Suite.
+ */
+export const ADMIN_EMAIL = "akshay.manjramkar@jindalmumbai.com";
 
 export const PO_STATUSES = [
   "draft",

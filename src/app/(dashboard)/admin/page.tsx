@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Settings, ShieldCheck, Users } from "lucide-react";
+import { Loader2, Settings, ShieldCheck, UserX, Users } from "lucide-react";
 import { RoleGuard } from "@/components/layout/RoleGuard";
+import { QueryError } from "@/components/ui/ErrorBoundary";
+import { TableSkeleton } from "@/components/ui/Skeletons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,47 +19,47 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CURRENCIES, RIGS, ROLE_LABELS, ROLES } from "@/lib/constants";
+import { CURRENCIES, RIGS, ROLE_LABELS, ROLES, type Role } from "@/lib/constants";
 import { DEFAULT_FX_RATES } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
-
-const SEED_USERS = [
-  {
-    id: "1",
-    name: "Aarav Sharma",
-    email: "aarav.sharma@jindaldrilling.com",
-    role: "csuite" as const,
-    rigs: "All",
-    active: true,
-  },
-  {
-    id: "2",
-    name: "Priya Iyer",
-    email: "priya.iyer@jindaldrilling.com",
-    role: "manager" as const,
-    rigs: "Discovery 1, Virtue 1",
-    active: true,
-  },
-  {
-    id: "3",
-    name: "Rohit Kapoor",
-    email: "rohit.kapoor@jindaldrilling.com",
-    role: "engineer" as const,
-    rigs: "Jindal Star",
-    active: true,
-  },
-  {
-    id: "4",
-    name: "Meera Joshi",
-    email: "meera.joshi@jindaldrilling.com",
-    role: "engineer" as const,
-    rigs: "Jindal Explorer",
-    active: false,
-  },
-];
+import { useUsers } from "@/hooks/useUsers";
+import { useToast } from "@/components/ui/Toast";
+import type { DbProfile } from "@/types/database";
 
 export default function AdminPage() {
   const [fxRates, setFxRates] = useState(DEFAULT_FX_RATES);
+  const { users, loading: usersLoading, error: usersError, refresh: refreshUsers, updateRole, toggleActive } = useUsers();
+  const toast = useToast();
+  const [workingId, setWorkingId] = useState<string | null>(null);
+
+  async function handleRoleChange(user: DbProfile, next: Role) {
+    if (next === user.role) return;
+    setWorkingId(user.id);
+    try {
+      await updateRole(user.id, next);
+      toast.success(
+        "Role updated",
+        `${user.full_name ?? user.email} → ${ROLE_LABELS[next]}`,
+      );
+    } catch (e) {
+      toast.error("Role update failed", e instanceof Error ? e.message : undefined);
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  async function handleToggleActive(user: DbProfile) {
+    setWorkingId(user.id);
+    try {
+      const next = !(user.active ?? true);
+      await toggleActive(user.id, next);
+      toast.success(next ? "User reactivated" : "User deactivated");
+    } catch (e) {
+      toast.error("Status update failed", e instanceof Error ? e.message : undefined);
+    } finally {
+      setWorkingId(null);
+    }
+  }
 
   return (
     <main className="flex-1 space-y-6 p-4 md:p-6">
@@ -76,52 +78,95 @@ export default function AdminPage() {
           </Badge>
         </header>
 
-        <RoleGuard allow={["manager", "csuite"]}>
+        <RoleGuard allow={["admin", "csuite", "manager"]}>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-start justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-brand-green" /> Users & Roles
                 </CardTitle>
-                <CardDescription>{SEED_USERS.length} users provisioned</CardDescription>
+                <CardDescription>
+                  {users.length} user{users.length === 1 ? "" : "s"} · live from
+                  public.profiles
+                </CardDescription>
               </div>
-              <Button size="sm">
-                <Plus className="h-4 w-4" /> Invite User
-              </Button>
             </CardHeader>
             <CardContent>
-              <div className="rounded-xl border border-brand-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Rig Access</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {SEED_USERS.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell className="font-medium">{u.name}</TableCell>
-                        <TableCell className="text-sm text-brand-muted">{u.email}</TableCell>
-                        <TableCell>
-                          <Badge variant="default" className="capitalize">
-                            {ROLE_LABELS[u.role]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">{u.rigs}</TableCell>
-                        <TableCell>
-                          <Badge variant={u.active ? "default" : "secondary"}>
-                            {u.active ? "Active" : "Disabled"}
-                          </Badge>
-                        </TableCell>
+              {usersError ? (
+                <QueryError message={usersError} onRetry={() => void refreshUsers()} />
+              ) : usersLoading ? (
+                <TableSkeleton rows={6} columns={5} />
+              ) : users.length === 0 ? (
+                <p className="text-sm text-brand-muted">
+                  No profiles yet. Sign up from the login page to populate this table.
+                </p>
+              ) : (
+                <div className="rounded-xl border border-brand-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((u) => {
+                        const isActive = u.active ?? true;
+                        const busy = workingId === u.id;
+                        return (
+                          <TableRow key={u.id}>
+                            <TableCell className="font-medium">
+                              {u.full_name ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-brand-muted">
+                              {u.email ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={u.role}
+                                onChange={(e) =>
+                                  void handleRoleChange(u, e.target.value as Role)
+                                }
+                                disabled={busy}
+                                className="h-8 w-40 text-xs"
+                              >
+                                {ROLES.map((r) => (
+                                  <option key={r} value={r}>
+                                    {ROLE_LABELS[r]}
+                                  </option>
+                                ))}
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={isActive ? "default" : "secondary"}>
+                                {isActive ? "Active" : "Disabled"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleToggleActive(u)}
+                                disabled={busy}
+                              >
+                                {busy ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <UserX className="h-3.5 w-3.5" />
+                                )}
+                                {isActive ? "Deactivate" : "Reactivate"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -183,18 +228,19 @@ export default function AdminPage() {
                   </TableHeader>
                   <TableBody>
                     {[
-                      { cap: "View Fleet", e: true, m: true, c: true },
-                      { cap: "Edit Line Items", e: true, m: true, c: false },
-                      { cap: "Generate PO", e: true, m: true, c: false },
-                      { cap: "Approve PO", e: false, m: true, c: true },
-                      { cap: "Manage Users", e: false, m: false, c: true },
-                      { cap: "Edit FX Rates", e: false, m: true, c: true },
+                      { cap: "View Fleet",      e: true,  m: true,  c: true,  a: true  },
+                      { cap: "Edit Line Items", e: true,  m: true,  c: false, a: true  },
+                      { cap: "Generate PO",     e: true,  m: true,  c: false, a: true  },
+                      { cap: "Approve PO",      e: false, m: true,  c: true,  a: true  },
+                      { cap: "Manage Users",    e: false, m: false, c: true,  a: true  },
+                      { cap: "Edit FX Rates",   e: false, m: true,  c: true,  a: true  },
                     ].map((row) => (
                       <TableRow key={row.cap}>
                         <TableCell className="font-medium">{row.cap}</TableCell>
                         <TableCell className="text-center">{row.e ? "✓" : "—"}</TableCell>
                         <TableCell className="text-center">{row.m ? "✓" : "—"}</TableCell>
                         <TableCell className="text-center">{row.c ? "✓" : "—"}</TableCell>
+                        <TableCell className="text-center">{row.a ? "✓" : "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

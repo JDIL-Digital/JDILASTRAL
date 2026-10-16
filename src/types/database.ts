@@ -20,7 +20,7 @@ export type ProjectStatus = "active" | "completed" | "on-hold";
 export type LineItemCurrency = "USD" | "INR" | "AED";
 export type LineItemStatus = "pending" | "on-track" | "watch" | "overrun";
 export type POStatus = "draft" | "approved" | "issued" | "cancelled";
-export type ProfileRole = "engineer" | "manager" | "csuite";
+export type ProfileRole = "engineer" | "manager" | "csuite" | "admin";
 
 export interface Database {
   public: {
@@ -207,6 +207,7 @@ export interface Database {
           role: ProfileRole;
           assigned_rig_id: string | null;
           avatar_url: string | null;
+          active: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -217,6 +218,7 @@ export interface Database {
           role?: ProfileRole;
           assigned_rig_id?: string | null;
           avatar_url?: string | null;
+          active?: boolean;
           created_at?: string;
           updated_at?: string;
         };

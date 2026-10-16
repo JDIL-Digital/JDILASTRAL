@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,16 @@ export default function LoginPage() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {loading ? "Signing in..." : "Sign In"}
             </Button>
+
+            <p className="pt-1 text-center text-xs text-brand-muted">
+              New user?{" "}
+              <Link
+                href="/signup"
+                className="font-semibold text-brand-green hover:underline"
+              >
+                Create an account →
+              </Link>
+            </p>
 
             <p className="pt-2 text-center text-[11px] text-brand-muted">
               By signing in, you agree to {APP.company}&apos;s acceptable-use policy.
