@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
+    "postbuild": "node -e \"const fs=require('fs');fs.cpSync('.next/static','.next/standalone/.next/static',{recursive:true});fs.cpSync('public','.next/standalone/public',{recursive:true});\"",
     "start": "node .next/standalone/server.js",
     "lint": "next lint",
     "migrate": "ts-node --project tsconfig.scripts.json scripts/migrate-jindal-pioneer.ts",
