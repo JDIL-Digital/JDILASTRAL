@@ -181,7 +181,7 @@ export async function getVendors(options?: { top?: number; filter?: string }): P
 }
 
 // --------------------------------------------------------------------------
-// Transformation — BC → JSIL·ASTRAL
+// Transformation — BC → JDIL·ASTRAL
 // --------------------------------------------------------------------------
 
 function mapBCStatusToForge(status: string): PurchaseOrder["status"] {
@@ -216,7 +216,7 @@ function mapBCLine(line: BCLineItem, poId: string): PurchaseOrderLine {
 }
 
 /**
- * Transform a BC purchase order into the JSIL·ASTRAL shape used throughout
+ * Transform a BC purchase order into the JDIL·ASTRAL shape used throughout
  * the app. Currency conversion to USD uses the active FX rate table.
  *
  * The caller is expected to supply `rigId`, `projectId`, `annexureId`

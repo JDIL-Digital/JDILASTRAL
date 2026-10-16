@@ -113,7 +113,7 @@ export function TopBar({ breadcrumbs, notifications = 3 }: TopBarProps) {
             })}
           </nav>
         ) : (
-          <span className="sr-only">JSIL ASTRAL</span>
+          <span className="sr-only">JDIL ASTRAL</span>
         )}
       </div>
 

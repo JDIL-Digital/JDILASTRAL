@@ -1,6 +1,6 @@
 -- ============================================================================
--- JSIL·ASTRAL — Migration 002
--- PO number sequence: JSIL/IPO/YYYY/NNNNN (resets each calendar year).
+-- JDIL·ASTRAL — Migration 002
+-- PO number sequence: JDIL/IPO/YYYY/NNNNN (resets each calendar year).
 --
 -- Called from the client via:
 --   const { data } = await supabase.rpc('get_next_po_number');
@@ -26,10 +26,10 @@ begin
   )
   into last_seq
   from public.purchase_orders
-  where po_number like 'JSIL/IPO/' || current_year || '/%';
+  where po_number like 'JDIL/IPO/' || current_year || '/%';
 
   next_seq := last_seq + 1;
-  po_number := 'JSIL/IPO/' || current_year || '/' ||
+  po_number := 'JDIL/IPO/' || current_year || '/' ||
                lpad(next_seq::text, 5, '0');
   return po_number;
 end;

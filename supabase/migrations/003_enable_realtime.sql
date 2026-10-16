@@ -1,5 +1,5 @@
 -- ============================================================================
--- JSIL·ASTRAL — Migration 003
+-- JDIL·ASTRAL — Migration 003
 -- Enable Supabase Realtime for the three tables our client subscribes to:
 --   • public.line_items        (useLineItems)
 --   • public.rigs              (useRigs, useFleetStats)

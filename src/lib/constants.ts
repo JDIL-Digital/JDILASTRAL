@@ -32,10 +32,10 @@ export const BRAND = {
 } as const;
 
 export const APP = {
-  name: "JSIL·ASTRAL",
+  name: "JDIL·ASTRAL",
   tagline: "Fleet Operations & Rig Governance Engine",
   company: "Jindal Drilling & Industries Ltd.",
-  footer: "Powered by JSIL Digital",
+  footer: "Powered by JDIL Digital",
   version: "1.0.0",
 } as const;
 

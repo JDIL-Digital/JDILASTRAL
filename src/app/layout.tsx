@@ -10,10 +10,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "JSIL·ASTRAL | Jindal Drilling",
+  title: "JDIL·ASTRAL | Jindal Drilling",
   description:
-    "JSIL·ASTRAL — Fleet Operations & Rig Governance Engine for Jindal Drilling & Industries Ltd.",
-  applicationName: "JSIL·ASTRAL",
+    "JDIL·ASTRAL — Fleet Operations & Rig Governance Engine for Jindal Drilling & Industries Ltd.",
+  applicationName: "JDIL·ASTRAL",
   authors: [{ name: "Jindal Drilling & Industries Ltd." }],
   keywords: [
     "Jindal Drilling",

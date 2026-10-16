@@ -9,7 +9,7 @@
  * MR No · PO No · Status
  *
  * Trailing TOTAL row shows column sums. Filename follows:
- * JSIL-ASTRAL-Ann{number}-{yyyy-MM-dd}.xlsx
+ * JDIL-ASTRAL-Ann{number}-{yyyy-MM-dd}.xlsx
  */
 
 import * as XLSX from "xlsx";
@@ -66,7 +66,7 @@ export function exportAnnexureToXlsx({
   // Title block above the table — three merged header rows that mirror
   // the original spreadsheet's letterhead.
   const title = [
-    [`JSIL·ASTRAL — Jindal Drilling & Industries Ltd.`],
+    [`JDIL·ASTRAL — Jindal Drilling & Industries Ltd.`],
     [`${rigName} · ${projectName}`],
     [`Annexure ${annexureNumber} — ${annexureName}`],
     [`Exported ${new Date().toLocaleString("en-IN")}`],
@@ -146,6 +146,6 @@ export function exportAnnexureToXlsx({
   XLSX.utils.book_append_sheet(wb, ws, `Ann ${annexureNumber}`);
 
   const today = new Date().toISOString().slice(0, 10);
-  const filename = `JSIL-ASTRAL-Ann${annexureNumber}-${today}.xlsx`;
+  const filename = `JDIL-ASTRAL-Ann${annexureNumber}-${today}.xlsx`;
   XLSX.writeFile(wb, filename);
 }

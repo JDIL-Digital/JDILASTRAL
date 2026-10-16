@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Professional A4 Purchase Order PDF — JSIL·ASTRAL / Jindal Drilling.
+ * Professional A4 Purchase Order PDF — JDIL·ASTRAL / Jindal Drilling.
  *
  * All drawing is done with jsPDF primitives (no autoTable dep). Measurements
  * are in points (72 pt = 1 inch; 56.7 pt ≈ 20 mm margin).
@@ -132,7 +132,7 @@ function drawHeader(doc: jsPDF, input: POPdfInput, pageNo: number, totalPages: n
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   setText(doc, C_MUTED);
-  doc.text("JSIL·ASTRAL · Fleet Operations & Rig Governance Engine", MARGIN, y + 30);
+  doc.text("JDIL·ASTRAL · Fleet Operations & Rig Governance Engine", MARGIN, y + 30);
 
   // Right: PURCHASE ORDER wordmark + PO meta
   setText(doc, C_GREEN);
@@ -450,7 +450,7 @@ function drawFooter(doc: jsPDF, pageNo: number, totalPages: number) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.text(
-    "JSIL·ASTRAL | Fleet Operations & Rig Governance Engine",
+    "JDIL·ASTRAL | Fleet Operations & Rig Governance Engine",
     MARGIN,
     y,
   );

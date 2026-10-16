@@ -5,7 +5,7 @@
  * 2. If not cached, fetch from https://api.frankfurter.app/{date}?from=USD&to=X.
  * 3. Upsert the fetched rate so subsequent lookups are instant.
  *
- * All dates are ISO yyyy-MM-dd. `base` is always "USD" for JSIL·ASTRAL —
+ * All dates are ISO yyyy-MM-dd. `base` is always "USD" for JDIL·ASTRAL —
  * the schema permits other bases, but every line_item converts to USD
  * so there's no reason to cache the inverse.
  */

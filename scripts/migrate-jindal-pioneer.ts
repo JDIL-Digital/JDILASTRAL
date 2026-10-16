@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /**
- * JSIL·ASTRAL — Jindal Pioneer historical data migration
+ * JDIL·ASTRAL — Jindal Pioneer historical data migration
  *
  * Reads scripts/jindal-pioneer-data.xlsx and bulk-inserts the 11
  * annexures into Supabase.
@@ -559,7 +559,7 @@ function printDetectedHeaders(sheetName: string, hdr: HeaderMap): void {
 // ──────────────────────────────── main ────────────────────────────────
 
 async function main(): Promise<void> {
-  console.log("\n=== JSIL·ASTRAL · Jindal Pioneer migration ===\n");
+  console.log("\n=== JDIL·ASTRAL · Jindal Pioneer migration ===\n");
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     console.error(

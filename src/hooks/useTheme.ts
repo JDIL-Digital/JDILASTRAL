@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type Theme = "light" | "dark";
 
-const STORAGE_KEY = "jsil:theme";
+const STORAGE_KEY = "jdil:theme";
 
 function readStoredTheme(): Theme | null {
   if (typeof window === "undefined") return null;

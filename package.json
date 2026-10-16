@@ -1,8 +1,8 @@
 {
-  "name": "jsil-astral",
+  "name": "jdil-astral",
   "version": "1.0.0",
   "private": true,
-  "description": "JSIL·ASTRAL — Fleet Operations & Rig Governance Engine for Jindal Drilling & Industries Ltd.",
+  "description": "JDIL·ASTRAL — Fleet Operations & Rig Governance Engine for Jindal Drilling & Industries Ltd.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

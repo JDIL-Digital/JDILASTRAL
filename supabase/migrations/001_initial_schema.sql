@@ -1,5 +1,5 @@
 -- ============================================================================
--- JSIL·ASTRAL — Fleet Operations & Rig Governance Engine
+-- JDIL·ASTRAL — Fleet Operations & Rig Governance Engine
 -- Jindal Drilling & Industries Ltd.
 --
 -- Migration: 001_initial_schema
@@ -163,7 +163,7 @@ create table public.purchase_orders (
 );
 
 -- Sequence for auto-numbering POs. Application layer formats it as
--- e.g. `JSIL-PO-2026-00001` when calling nextval('po_sequence').
+-- e.g. `JDIL-PO-2026-00001` when calling nextval('po_sequence').
 create sequence if not exists po_sequence start 1;
 
 

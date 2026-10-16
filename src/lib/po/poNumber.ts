@@ -4,7 +4,7 @@
  * PO number allocator — thin wrapper around the `get_next_po_number()`
  * Postgres function (see supabase/migrations/002_po_sequence.sql).
  *
- * Format: JSIL/IPO/YYYY/NNNNN
+ * Format: JDIL/IPO/YYYY/NNNNN
  *   - YYYY = current year
  *   - NNNNN = zero-padded sequence that resets each year
  *
@@ -26,7 +26,7 @@ export interface NextPoNumber {
 function offlineFallback(): string {
   const year = new Date().getFullYear();
   const stamp = Date.now().toString().slice(-5);
-  return `JSIL/IPO/${year}/${stamp}`;
+  return `JDIL/IPO/${year}/${stamp}`;
 }
 
 export async function getNextPoNumber(): Promise<NextPoNumber> {
@@ -48,5 +48,5 @@ export async function getNextPoNumber(): Promise<NextPoNumber> {
 
 /** Peek the current year's prefix without allocating — handy for placeholders. */
 export function poNumberPrefix(): string {
-  return `JSIL/IPO/${new Date().getFullYear()}/`;
+  return `JDIL/IPO/${new Date().getFullYear()}/`;
 }

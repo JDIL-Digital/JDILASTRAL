@@ -1,5 +1,5 @@
 /**
- * Reusable skeleton placeholders for JSIL·ASTRAL.
+ * Reusable skeleton placeholders for JDIL·ASTRAL.
  *
  * All variants use `animate-pulse` against brand-aware tokens so they look
  * right in both dark and light modes. Render these inside Suspense
