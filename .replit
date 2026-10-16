@@ -1,16 +1,19 @@
-run = "npm run start"
+run = "node .next/standalone/server.js"
 entrypoint = "src/app/page.tsx"
 
 [nix]
 channel = "stable-23_11"
 
 [deployment]
-run = ["sh", "-c", "npm run build && npm run start"]
+run = ["sh", "-c", "npm run build && node .next/standalone/server.js"]
 deploymentTarget = "cloudrun"
 
 [env]
 NEXT_TELEMETRY_DISABLED = "1"
 NODE_ENV = "production"
+# Standalone server reads PORT from env — Replit sets it automatically.
+# For local dev-container runs, PORT defaults to 3000 inside the server.
+PORT = "3000"
 
 [[ports]]
 localPort = 3000
