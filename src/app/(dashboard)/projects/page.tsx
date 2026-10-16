@@ -144,21 +144,29 @@ function ProjectCard({ project }: { project: ProjectWithRig }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex flex-col gap-2 pt-1">
           <span className="text-xs text-brand-muted">
             {annexures.length} annexure{annexures.length === 1 ? "" : "s"}
           </span>
-          <Link
-            href={
-              firstAnnexure
-                ? `/projects/${project.id}/annexures/${firstAnnexure.id}`
-                : `/projects/${project.id}/annexures/`
-            }
-          >
-            <Button variant="outline" size="sm">
-              Open Annexures <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={
+                firstAnnexure
+                  ? `/projects/${project.id}/annexures/${firstAnnexure.id}`
+                  : `/projects/${project.id}/annexures/`
+              }
+              className="flex-1"
+            >
+              <Button variant="outline" size="sm" className="w-full">
+                Open Annexures <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+            <Link href={`/projects/${project.id}/summary`} className="flex-1">
+              <Button size="sm" className="w-full">
+                View Summary <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="flex items-center justify-between pt-1 text-xs text-brand-muted">

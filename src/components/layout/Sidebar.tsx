@@ -299,19 +299,21 @@ function SidebarProjectRow({
   const barColor =
     burnPct > 90 ? "bg-brand-danger" : burnPct > 70 ? "bg-brand-warning" : "bg-brand-green";
 
+  const summaryHref = `/projects/${projectId}/summary`;
+
   return (
-    <li>
-      <Link
-        href={href}
-        prefetch={true}
+    <li
+      className={cn(
+        "animate-fade-in rounded-md",
+        `delay-step-${Math.min(7, index)}`,
+        active && "bg-brand-green/10",
+      )}
+    >
+      {/* Project card: info display, no link (child links handle nav) */}
+      <div
         className={cn(
-          "group relative block rounded-md py-2 pl-4 pr-3 text-sm transition-all duration-200",
-          "hover:bg-brand-green/10 hover:translate-x-0.5",
-          active
-            ? "bg-brand-green/12 text-brand-green font-semibold"
-            : "text-brand-text/90 hover:text-brand-text",
-          `delay-step-${Math.min(7, index)}`,
-          "animate-fade-in",
+          "relative rounded-t-md py-2 pl-4 pr-3",
+          active && "bg-brand-green/12",
         )}
         title={`${rigName} · ${projectName}`}
       >
@@ -319,11 +321,18 @@ function SidebarProjectRow({
           aria-hidden
           className={cn(
             "absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-green transition-opacity",
-            active ? "opacity-100" : "opacity-0 group-hover:opacity-40",
+            active ? "opacity-100" : "opacity-0",
           )}
         />
         <div className="flex items-center gap-2">
-          <span className="truncate text-xs">{projectName}</span>
+          <span
+            className={cn(
+              "truncate text-xs",
+              active ? "font-semibold text-brand-green" : "text-brand-text",
+            )}
+          >
+            {projectName}
+          </span>
           <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-brand-muted">
             {burnPct.toFixed(0)}%
           </span>
@@ -337,7 +346,25 @@ function SidebarProjectRow({
             style={{ width: `${burnPct}%` }}
           />
         </div>
-      </Link>
+      </div>
+
+      {/* Child links: Annexures + Summary */}
+      <div className="flex gap-1 border-t border-brand-border/40 px-4 py-1.5">
+        <Link
+          href={href}
+          prefetch={true}
+          className="flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-brand-muted transition-colors hover:bg-brand-green/15 hover:text-brand-green"
+        >
+          Annexures
+        </Link>
+        <Link
+          href={summaryHref}
+          prefetch={true}
+          className="flex-1 rounded px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-brand-muted transition-colors hover:bg-brand-green/15 hover:text-brand-green"
+        >
+          Summary
+        </Link>
+      </div>
     </li>
   );
 }

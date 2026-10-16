@@ -34,9 +34,17 @@ export function RigCard({ rig, className, index = 0 }: RigCardProps) {
     burnPct > 90 ? "bg-brand-danger" : burnPct > 70 ? "bg-brand-warning" : "bg-brand-green";
   const stepClass = `delay-step-${Math.min(7, index)}`;
 
+  // Prefer the DB UUID when it's a real id; the dashboard's `useRig()`
+  // transparently supports both uuid and slug lookup, so this is safe
+  // whether or not the backing hook has returned real data yet.
+  const isUuid =
+    typeof rig.id === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rig.id);
+  const href = `/rig/${isUuid ? rig.id : meta.slug}`;
+
   return (
     <Link
-      href={`/rig/${meta.slug}`}
+      href={href}
       className={cn(
         "group relative block min-h-[280px] overflow-hidden rounded-2xl border border-brand-border",
         "animate-fade-in-up will-change-transform",

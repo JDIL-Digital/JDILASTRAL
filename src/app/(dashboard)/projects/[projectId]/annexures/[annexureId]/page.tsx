@@ -147,6 +147,13 @@ export default function AnnexurePage() {
             <span className="font-medium text-brand-text">{rigName}</span>
             <ChevronRight className="h-3 w-3" />
             <span className="font-medium text-brand-text">{projectName}</span>
+            <ChevronRight className="h-3 w-3" />
+            <Link
+              href={`/projects/${projectId}/summary`}
+              className="font-semibold text-brand-green hover:underline"
+            >
+              Summary
+            </Link>
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-brand-text md:text-3xl">
             Ann. {annexureRoman} — {annexure.name}
