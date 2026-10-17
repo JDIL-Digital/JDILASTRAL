@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BarChart2,
   Briefcase,
   FileText,
   LayoutDashboard,
@@ -25,6 +26,7 @@ import type { DbRig } from "@/types/database";
 const NAV = [
   { href: "/fleet", label: "Fleet Overview", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: Briefcase },
+  { href: "/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/purchase-orders", label: "Purchase Orders", icon: FileText },
   { href: "/admin", label: "Administration", icon: ShieldCheck },
   { href: "/admin/bc-sync", label: "Business Central", icon: Plug },
@@ -59,7 +61,7 @@ export function Sidebar() {
   // Aggressively prefetch every primary route on mount so subsequent
   // clicks navigate instantly with no extra round-trip.
   useEffect(() => {
-    const main = ["/fleet", "/projects", "/purchase-orders", "/admin", "/admin/bc-sync"];
+    const main = ["/fleet", "/projects", "/analytics", "/purchase-orders", "/admin", "/admin/bc-sync"];
     main.forEach((r) => router.prefetch(r));
     rigList.forEach((r) => router.prefetch(`/rig/${r.id}`));
     projects.forEach((p) => router.prefetch(`/projects/${p.id}/annexures/`));
